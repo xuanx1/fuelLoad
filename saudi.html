@@ -1,0 +1,2443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saudi Arabia's Energy, Mapped</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: bold;
+            color: #333;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .legend {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .legend h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            margin-right: 10px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .stats {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .stats h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .stat-label {
+            font-weight: bold;
+        }
+
+        .risk-high { color: #d32f2f; }
+        .risk-medium { color: #f57c00; }
+        .risk-low { color: #388e3c; }
+
+        .status-info {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        #refreshBtn {
+            width: 100%;
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        #refreshBtn:hover:not(:disabled) {
+            background-color: #005a87;
+        }
+
+        #refreshBtn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading, .error {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 6px;
+            z-index: 999;
+            font-weight: bold;
+        }
+
+        .loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        /* Progress bar - marker loading */
+        .progress-container {
+            position: fixed;
+            top: 20px;
+            left: 170px;
+            transform: translateX(-50%);
+            background: white;
+            opacity: 0.65;
+            backdrop-filter: blur(5px);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 999;
+            min-width: 300px;
+            display: none;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .progress-bar-container {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #007cba, #005a87);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-stats {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        .leaflet-interactive {
+            transition: opacity 0.3s ease-in-out, fill-opacity 0.3s ease-in-out !important;
+        }
+
+        /* Refinery Map Styles */
+        .refinery-section {
+            margin-bottom: 20px;
+            background: #f0f8ff;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .refinery-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding: 20px 20px 15px 20px;
+            flex-shrink: 0;
+        }
+
+        .refinery-header span {
+            font-size: 1.3em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        
+        .refinery-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* Minimalist scrollbar for refinery content */
+        .refinery-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .refinery-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .refinery-content::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .refinery-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        .refinery-content.expanded {
+            max-height: 400px;
+        }
+        
+        .refinery-list {
+            padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        /* Minimalist scrollbar for refinery list */
+        .refinery-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .refinery-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .refinery-list::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .refinery-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        .refinery-item {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(3px);
+        }
+        
+        .refinery-item:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .refinery-name {
+            font-weight: bold;
+            color: white;
+            font-size: 0.9em;
+            margin-bottom: 3px;
+        }
+        
+        .refinery-company {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.8em;
+            margin-bottom: 5px;
+        }
+        
+        .refinery-capacity {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7em;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .refinery-location {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.7em;
+            margin-top: 3px;
+        }
+        
+        .refinery-toggle {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+        
+        .refinery-toggle.expanded {
+            transform: rotate(180deg);
+        }
+        
+        .total-capacity {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+            backdrop-filter: blur(3px);
+            margin: 0 20px 20px 20px;
+            flex-shrink: 0;
+        }
+        
+        .capacity-number {
+            font-size: 1.2em;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .refinery-marker {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .refinery-with-arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+
+        .capacity-arrow {
+            position: relative;
+            margin-bottom: 2px;
+        }
+
+        .capacity-arrow-shape {
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-left: 8px solid #1976D2;
+            border-right: 8px solid #1976D2;
+            background: rgba(25, 118, 210, 0.089);
+            position: relative;
+        }
+
+        .capacity-arrow-shape::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            bottom: 0;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            background: rgba(25, 118, 210, 0.123);
+        }
+
+        .refinery-emoji {
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+
+        /* Standalone Refinery Section - positioned on map */
+        .standalone-refinery-section {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            bottom: 20px;
+            width: 320px;
+            height: calc(100vh - 40px);
+            background: rgba(30, 64, 175, 0.95);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 1000;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Minimalist scrollbar for refineries section */
+        .standalone-refinery-section::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .standalone-refinery-section::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .standalone-refinery-section::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .standalone-refinery-section::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Hover tooltip styles */
+        .refinery-tooltip {
+            position: absolute;
+            background: rgba(30, 64, 175, 0.95);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+            max-width: 200px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .refinery-tooltip.visible {
+            opacity: 1;
+        }
+
+        /* Custom popup styling to match tooltip design */
+        .leaflet-popup-content-wrapper {
+            background: transparent !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+            padding: 0 !important;
+        }
+
+        .leaflet-popup-content {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .leaflet-popup-tip {
+            background: rgba(30, 61, 156, 0.95) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+        }
+
+        .city-title {
+            position: fixed;
+            bottom: 30px;
+            left: 35px;
+            color: rgba(30, 64, 175, 0.95);
+            font-size: 56px;
+            font-weight: bold;
+            font-family: 'Gotham Bold', 'Gotham', 'Helvetica Neue', Arial, sans-serif;
+            z-index: 998;
+            pointer-events: auto;
+            cursor: default;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+
+        .city-subtitle {
+            position: fixed;
+            bottom: 100px;
+            left: 25px;
+            padding: 0px 15px;
+            z-index: 999;
+            font-size: 12px;
+            font-family: 'Gotham', 'Helvetica Neue', Arial, sans-serif;
+            font-weight: bold;
+            opacity: 0.7;
+            color: #383838;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            transition: letter-spacing 0.3s ease;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: transparent !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .leaflet-popup-content {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+        }
+
+        .leaflet-popup-tip {
+            background: rgba(30, 61, 156, 0.95) !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+        }
+
+        .leaflet-popup-close-button {
+            color: white !important;
+            font-weight: normal !important;
+            font-size: 18px !important;
+        }
+
+        /* City selector */
+        .city-selector {
+            position: fixed;
+            bottom: 40px;
+            right: 20px;
+            z-index: 999;
+            background: rgba(66, 66, 66, 0.12);
+            border-radius: 25px;
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .city-option {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: transparent;
+            border: none;
+            color: #424242;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0.5;
+        }
+
+        .city-option.active {
+            background: rgba(66, 66, 66, 0.8);
+            color: white;
+            opacity: 1;
+        }
+
+        .city-option:hover {
+            opacity: 0.8;
+        }
+
+        /* Production vs Demand Section - positioned below refineries */
+        .production-demand-section {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            bottom: 140px;
+            width: 380px;
+            background: rgba(30, 64, 175, 0.95);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 1000;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .production-demand-container {
+            padding: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .production-demand-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 15px;
+        }
+
+        .production-demand-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .production-demand-subtitle {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .stat-label {
+            font-size: 0.7em;
+            opacity: 0.8;
+            line-height: 1.2;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            min-height: 250px;
+        }
+
+        #productionDemandChart {
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <!-- Title for the combined map -->
+    <div class="city-title" id="cityTitle">Saudi Arabia's Energy</div>
+    <div class="city-subtitle" id="citySubtitle">Production vs Demand</div>
+    
+    <!-- Hover tooltip for refineries -->
+    <div class="refinery-tooltip" id="refineryTooltip"></div>
+    
+    <!-- Standalone Refinery Section -->
+    <div class="standalone-refinery-section">
+        <div class="refinery-header">
+            <span>Refinery Capacity</span>
+        </div>
+        <div class="refinery-content" id="refineryContent" style="display: block;">
+            <div class="total-capacity">
+                <span class="capacity-number" id="totalCapacity">0 thousand</span>
+                <span>barrels/day</span>
+            </div>
+            <div class="refinery-list" id="refineryList">
+                <!-- Refinery items will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Production vs Demand Section -->
+    <div class="production-demand-section">
+        <div class="production-demand-container">
+            <div class="production-demand-header">
+                <div class="production-demand-title">Production vs Demand</div>
+                <div class="production-demand-subtitle">Refined Products</div>
+            </div>
+            
+            <div class="stats-grid" id="productionStatsGrid">
+                <div class="stat-card">
+                    <div class="stat-value" id="avgProduction">Loading...</div>
+                    <div class="stat-label">Avg Production (kb/d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgDemand">Loading...</div>
+                    <div class="stat-label">Avg Demand (kb/d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgSurplus">Loading...</div>
+                    <div class="stat-label">Avg Surplus (kb/d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="currentSurplus">Loading...</div>
+                    <div class="stat-label">Latest Surplus (kb/d)</div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="productionDemandChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="error" id="error" style="display: none;"></div>
+
+    <!-- Combined progress container for data loading and marker plotting -->
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-text" id="progressText">Loading restaurants...</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="progress-stats" id="progressStats">0 / 0 markers loaded</div>
+    </div>
+
+    <script>
+        let map;
+        let allData = [];
+        let refineryCapacityData = [];
+        let individualMarkers = [];
+        let progressContainer = null;
+        let progressBar = null;
+        let progressText = null;
+        let progressStats = null;
+        let spatialIndex = null;
+        let currentZoomLevel = 11;
+        let maxMarkersPerLoad = 2000;
+        let isLoadingData = false;
+        let isLoadingIndividualMarkers = false;
+        let loadingAbortController = null;
+        let currentFilters = {
+            type: 'all',
+            startDate: null,
+            endDate: null
+        };
+
+        // List of CSVs in the data folder (manually listed, as browser JS can't read directories)
+        const csvFiles = [
+            'data/refined products demand csv.csv',
+            'data/Refinery capacities csv.csv',
+            'data/Exports of Refined Products 2024 csv.csv',
+            'data/Exports of Refined products csv.csv',
+            'data/Production of Refined Products csv.csv',
+            'data/Reserves, Natural Gas csv.csv'
+        ];
+
+        // Calculate letter spacing to match title width
+        function calculateLetterSpacing(titleText, subtitleText) {
+            // City-specific character width estimates
+            let titleCharWidth;
+            if (titleText === 'SEATTLE') {
+                titleCharWidth = 42.5;
+            } else if (titleText === 'NEW YORK') {
+                titleCharWidth = 47;
+            } else if (titleText === 'CHICAGO') {
+                titleCharWidth = 45;
+            } else if (titleText === 'SAN FRANCISCO') {
+                titleCharWidth = 43;
+            } else {
+                titleCharWidth = 42.5; // default fallback
+            }
+            
+            const subtitleCharWidth = 8; // 12px font size characters are about 8px wide
+            
+            const titleWidth = titleText.length * titleCharWidth;
+            const subtitleWidth = subtitleText.length * subtitleCharWidth;
+            
+            // Calculate additional spacing needed to match title width
+            const extraWidth = titleWidth - subtitleWidth;
+            const spacingPerGap = extraWidth / (subtitleText.length - 1);
+            
+            // Convert to em units for letter-spacing
+            const letterSpacing = spacingPerGap / 12; // Based on 12px subtitle font size
+            
+            return Math.max(0, letterSpacing);
+        }
+
+        // Update subtitle letter spacing
+        function updateSubtitleSpacing() {
+            const titleText = cityConfigs[currentCity].name;
+            const subtitleText = 'FOOD ESTABLISHMENT INSPECTION';
+            const spacing = calculateLetterSpacing(titleText, subtitleText);
+            document.getElementById('citySubtitle').style.letterSpacing = spacing + 'em';
+        }
+
+        // Update risk legend text based on current city
+        function updateRiskLegend() {
+            const riskDefinitions = {
+                seattle: {
+                    high: 'High Risk (15+ violation points)',
+                    medium: 'Medium Risk (5-14 violation points)', 
+                    low: 'Low Risk (0-4 violation points)'
+                },
+                nyc: {
+                    high: 'High Risk (28+ violation points, Grade C+)',
+                    medium: 'Medium Risk (14-27 points, Grade B)',
+                    low: 'Low Risk (0-13 points, Grade A)'
+                },
+                chicago: {
+                    high: 'High Risk (Risk 1 establishments)',
+                    medium: 'Medium Risk (Risk 2 establishments)',
+                    low: 'Low Risk (Risk 3 establishments)'
+                },
+                sfo: {
+                    high: 'High Risk (10+ violations)',
+                    medium: 'Medium Risk (3-9 violations)',
+                    low: 'Low Risk (0-2 violations)'
+                }
+            };
+
+            const definitions = riskDefinitions[currentCity] || riskDefinitions.seattle;
+            
+            // Update legend
+            document.getElementById('riskHighText').textContent = definitions.high;
+            document.getElementById('riskMediumText').textContent = definitions.medium;
+            document.getElementById('riskLowText').textContent = definitions.low;
+            
+            // Update filter dropdown options
+            document.getElementById('riskHighOption').textContent = definitions.high;
+            document.getElementById('riskMediumOption').textContent = definitions.medium;
+            document.getElementById('riskLowOption').textContent = definitions.low;
+        }
+
+        // Initialize map
+        function initializeMap() {
+            // Define GCC region bounds (Southwest and Northeast corners)
+            const gccBounds = L.latLngBounds(
+                [12.0, 34.0], // Southwest corner (Southern Yemen/Oman border, Western Saudi Arabia)
+                [32.0, 61.0]  // Northeast corner (Northern Kuwait, Eastern UAE/Oman)
+            );
+
+            map = L.map('map', {
+                minZoom: 5.7,
+                maxZoom: 18,
+                zoomControl: false,
+                maxBounds: gccBounds,
+                maxBoundsViscosity: 1.0 // Prevents panning outside bounds
+            }).setView([24.7136, 46.6753], 6); // Center on Saudi Arabia
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© OpenStreetMap contributors, © CARTO'
+            }).addTo(map);
+
+            progressContainer = document.getElementById('progressContainer');
+            progressBar = document.getElementById('progressBar');
+            progressText = document.getElementById('progressText');
+            progressStats = document.getElementById('progressStats');
+
+            currentZoomLevel = map.getZoom();
+            map.on('zoomend', function() {
+                currentZoomLevel = map.getZoom();
+                maxMarkersPerLoad = getMaxMarkersForZoom(currentZoomLevel);
+            });
+
+            let moveTimeout;
+            map.on('moveend', function() {
+                clearTimeout(moveTimeout);
+                moveTimeout = setTimeout(() => {
+                    loadIndividualMarkersInView();
+                }, 300);
+            });
+        }
+
+        // Load and parse data
+        async function loadData() {
+            isLoadingData = true;
+            showDataProgress('Loading CSV data for analysis...');
+            let allRows = [];
+            
+            // Load CSV files for data analysis (not for mapping)
+            for (let i = 0; i < csvFiles.length; i++) {
+                updateProgress(i, csvFiles.length, `Loading ${csvFiles[i]}...`, 'data');
+                try {
+                    const rows = await d3.csv(csvFiles[i]);
+                    if (rows && rows.length > 0) {
+                        rows.forEach(r => {
+                            r.sourceFile = csvFiles[i];
+                        });
+                        allRows = allRows.concat(rows);
+                        console.log(`Loaded ${rows.length} records from ${csvFiles[i]}`);
+                    }
+                } catch (e) {
+                    console.warn('Failed to load', csvFiles[i], 'Error:', e.message);
+                }
+            }
+            
+            allData = allRows;
+            hideProgress();
+            populateFilters();
+            console.log(`Total loaded: ${allData.length} records from ${csvFiles.length} files`);
+            isLoadingData = false;
+        }
+
+        // Load supplemental data from API with pagination
+        async function loadSupplementalAPIData(city, signal = null) {
+            const config = cityConfigs[city];
+            if (!config.apiUrl) {
+                console.log(`No API configured for ${city}`);
+                return [];
+            }
+            
+            console.log(`Loading supplemental data from API for ${city}`);
+            const currentYear = new Date().getFullYear();
+            const allApiData = [];
+            let offset = 0;
+            const limit = 1000; // Batch size per request
+            let hasMoreData = true;
+            
+            try {
+                while (hasMoreData && allApiData.length < config.maxApiLimit) {
+                    // Check if loading was aborted
+                    if (signal && signal.aborted) {
+                        throw new Error('Loading aborted');
+                    }
+                    
+                    // Build API URL with pagination and date filter
+                    const apiUrl = new URL(config.apiUrl);
+                    apiUrl.searchParams.set('$limit', limit.toString());
+                    apiUrl.searchParams.set('$offset', offset.toString());
+                    
+                    // Filter for current year data
+                    if (city === 'seattle') {
+                        apiUrl.searchParams.set('$where', `date_extract_y(inspection_date) = ${currentYear}`);
+                    } else if (city === 'nyc') {
+                        apiUrl.searchParams.set('$where', `date_extract_y(inspection_date) = ${currentYear}`);
+                    }
+                    
+                    console.log(`Fetching API data: offset=${offset}, limit=${limit}`);
+                    
+                    const response = await fetch(apiUrl.toString(), { signal });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    const batchData = await response.json();
+                    
+                    // Check if we got data
+                    if (!batchData || batchData.length === 0) {
+                        hasMoreData = false;
+                        break;
+                    }
+                    
+                    allApiData.push(...batchData);
+                    offset += limit;
+                    
+                    // If we got less than the limit, we've reached the end
+                    if (batchData.length < limit) {
+                        hasMoreData = false;
+                    }
+                    
+                    console.log(`API batch loaded: ${batchData.length} records, total: ${allApiData.length}`);
+                    
+                    // Small delay to prevent overwhelming the API
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                
+                console.log(`API data loading complete: ${allApiData.length} total records from ${city} API`);
+                
+                // Process API data to match our internal format
+                const processedApiData = allApiData.map(d => {
+                    const mapping = config.apiMapping;
+                    
+                    // Parse date
+                    let inspectionDate;
+                    const dateStr = d[mapping.inspectionDate];
+                    if (dateStr) {
+                        inspectionDate = new Date(dateStr);
+                        if (isNaN(inspectionDate.getTime())) {
+                            inspectionDate = new Date();
+                        }
+                    } else {
+                        inspectionDate = new Date();
+                    }
+                    
+                    const lat = parseFloat(d[mapping.latitude]);
+                    const lng = parseFloat(d[mapping.longitude]);
+                    
+                    return {
+                        name: d[mapping.name] || '',
+                        inspectionDate: inspectionDate,
+                        address: d[mapping.address] || '',
+                        zipCode: d[mapping.zipCode] || '',
+                        latitude: lat,
+                        longitude: lng,
+                        inspectionType: d[mapping.inspectionType] || '',
+                        inspectionScore: parseInt(d[mapping.inspectionScore]) || 0,
+                        inspectionResult: d[mapping.inspectionResult] || '',
+                        violationType: d[mapping.violationType] || '',
+                        violationPoints: parseInt(d[mapping.violationPoints]) || 0,
+                        grade: d[mapping.grade] || '',
+                        businessId: d[mapping.businessId] || '',
+                        riskLevel: classifyRisk(d[mapping.violationPoints], city, d[mapping.risk] || '', d[mapping.inspectionResult] || ''),
+                        source: 'api' // Track data source
+                    };
+                }).filter(d => {
+                    // Filter for valid records with coordinates
+                    const hasValidCoords = d.latitude && d.longitude && d.zipCode && 
+                                         !isNaN(d.latitude) && !isNaN(d.longitude);
+                    const isCurrentYear = d.inspectionDate.getFullYear() === currentYear;
+                    return hasValidCoords && isCurrentYear;
+                });
+                
+                console.log(`Processed API data: ${processedApiData.length} valid records`);
+                return processedApiData;
+                
+            } catch (error) {
+                if (error.message === 'Loading aborted') {
+                    console.log(`API loading aborted for ${city}`);
+                    throw new Error('AbortError');
+                }
+                console.error(`Error loading API data for ${city}:`, error);
+                // Return empty array on error - CSV data will still be available
+                return [];
+            }
+        }
+
+        // Helper function to get value from object with fallback column names
+        function getValueWithFallback(data, primaryKey, fallbackKeys = []) {
+            if (data[primaryKey] !== undefined) {
+                return data[primaryKey];
+            }
+            
+            for (const fallback of fallbackKeys) {
+                if (data[fallback] !== undefined) {
+                    console.log(`Using fallback column '${fallback}' instead of '${primaryKey}'`);
+                    return data[fallback];
+                }
+            }
+            
+            return '';
+        }
+
+        // Load hybrid data from CSV and API
+        async function loadFromCSV(city, signal = null) {
+            const config = cityConfigs[city];
+            console.log(`Loading hybrid data for ${city} from CSV + API`);
+            
+            try {
+                // Check if aborted before starting
+                if (signal && signal.aborted) {
+                    throw new Error('Loading aborted');
+                }
+                
+                // Load CSV data (main source)
+                console.log(`Step 1: Loading CSV data from ${config.csvFile}`);
+                const csvData = await d3.csv(config.csvFile);
+                
+                // Check if aborted after CSV load
+                if (signal && signal.aborted) {
+                    throw new Error('Loading aborted');
+                }
+                
+                console.log(`Raw CSV data loaded: ${csvData.length} records`);
+                updateProgress(1, 4, `Processing ${csvData.length} CSV records...`, 'data');
+                
+                // Get current year for filtering
+                const currentYear = new Date().getFullYear();
+                console.log(`Filtering data for current year: ${currentYear}`);
+                
+                // Process CSV data
+                const processedCsvData = csvData.map(d => {
+                    // Handle date parsing for different formats
+                    let inspectionDate;
+                    const dateStr = getValueWithFallback(d, config.dataMapping.inspectionDate, ['INSPECTION_DATE', 'InspectionDate', 'inspection_date']);
+                    if (dateStr) {
+                        // Try different date formats
+                        inspectionDate = new Date(dateStr);
+                        if (isNaN(inspectionDate.getTime())) {
+                            // Try MM/DD/YYYY format
+                            const parts = dateStr.split('/');
+                            if (parts.length === 3) {
+                                inspectionDate = new Date(parts[2], parts[0] - 1, parts[1]);
+                            }
+                        }
+                    }
+
+                    // Get latitude and longitude with fallbacks
+                    const lat = parseFloat(getValueWithFallback(d, config.dataMapping.latitude, ['LAT', 'lat', 'LATITUDE']));
+                    const lng = parseFloat(getValueWithFallback(d, config.dataMapping.longitude, ['LON', 'lng', 'LONGITUDE', 'lon']));
+
+                    // Handle city-specific data processing
+                    let violationPoints = 0;
+                    let riskLevel = 'low';
+                    
+                    if (city === 'chicago') {
+                        // Chicago has Risk column and violation text, calculate points from violations
+                        const riskText = getValueWithFallback(d, config.dataMapping.risk, []) || '';
+                        const violationText = getValueWithFallback(d, config.dataMapping.violationType, []) || '';
+                        
+                        // Extract risk level from Chicago risk text
+                        if (riskText.includes('Risk 1') || riskText.includes('High')) {
+                            riskLevel = 'high';
+                            violationPoints = 20; // High risk default
+                        } else if (riskText.includes('Risk 2') || riskText.includes('Medium')) {
+                            riskLevel = 'medium';
+                            violationPoints = 10; // Medium risk default
+                        } else {
+                            riskLevel = 'low';
+                            violationPoints = 2; // Low risk default
+                        }
+                        
+                        // Adjust points based on inspection result
+                        const result = getValueWithFallback(d, config.dataMapping.inspectionResult, []) || '';
+                        if (result === 'Fail') {
+                            violationPoints += 10;
+                        } else if (result === 'Pass w/ Conditions') {
+                            violationPoints += 5;
+                        }
+                        
+                    } else if (city === 'sfo') {
+                        // San Francisco uses violation_count
+                        violationPoints = parseInt(getValueWithFallback(d, config.dataMapping.violationPoints, [])) || 0;
+                        
+                        // Classify based on violation count for SF
+                        if (violationPoints >= 10) {
+                            riskLevel = 'high';
+                        } else if (violationPoints >= 3) {
+                            riskLevel = 'medium';
+                        } else {
+                            riskLevel = 'low';
+                        }
+                        
+                    } else {
+                        // Seattle and NYC use standard violation points
+                        violationPoints = parseInt(getValueWithFallback(d, config.dataMapping.violationPoints, ['POINTS', 'points', 'score', 'Score'])) || 0;
+                        const inspectionResult = getValueWithFallback(d, config.dataMapping.inspectionResult, ['RESULT', 'result']) || '';
+                        riskLevel = classifyRisk(violationPoints, city, '', inspectionResult);
+                    }
+
+                    const processed = {
+                        name: getValueWithFallback(d, config.dataMapping.name, ['BUSINESS_NAME', 'BusinessName', 'NAME']) || '',
+                        inspectionDate: inspectionDate || new Date(),
+                        address: getValueWithFallback(d, config.dataMapping.address, ['ADDRESS', 'STREET', 'Street']) || '',
+                        zipCode: getValueWithFallback(d, config.dataMapping.zipCode, ['ZIP', 'zip', 'ZIP_CODE']) || 'N/A',
+                        latitude: lat,
+                        longitude: lng,
+                        inspectionType: getValueWithFallback(d, config.dataMapping.inspectionType, ['TYPE', 'type']) || '',
+                        inspectionScore: parseInt(getValueWithFallback(d, config.dataMapping.inspectionScore, ['score', 'Score'])) || 0,
+                        inspectionResult: getValueWithFallback(d, config.dataMapping.inspectionResult, ['RESULT', 'result']) || '',
+                        violationType: getValueWithFallback(d, config.dataMapping.violationType, ['VIOLATION', 'violation']) || '',
+                        violationPoints: violationPoints,
+                        grade: getValueWithFallback(d, config.dataMapping.grade, ['grade', 'Grade']) || '',
+                        businessId: getValueWithFallback(d, config.dataMapping.businessId, ['ID', 'id', 'business_id']) || '',
+                        riskLevel: riskLevel,
+                        source: 'csv' // Track data source
+                    };
+                    
+                    return processed;
+                }).filter(d => {
+                    // Filter for valid records with coordinates
+                    const hasValidCoords = d.latitude && d.longitude && !isNaN(d.latitude) && !isNaN(d.longitude);
+                    
+                    // For cities without zip codes (Chicago, SF), don't require zipCode
+                    const hasLocation = city === 'chicago' || city === 'sfo' ? hasValidCoords : (hasValidCoords && d.zipCode);
+                    
+                    // Filter for current year only
+                    const isCurrentYear = d.inspectionDate && d.inspectionDate.getFullYear() === currentYear;
+                    
+                    return hasLocation && isCurrentYear;
+                });
+
+                console.log(`Processed CSV data: ${processedCsvData.length} valid records for ${currentYear}`);
+                
+                // Check if aborted before API load
+                if (signal && signal.aborted) {
+                    throw new Error('Loading aborted');
+                }
+                
+                // Step 2: Load supplemental API data
+                console.log(`Step 2: Loading supplemental API data`);
+                updateProgress(2, 4, `Loading supplemental API data...`, 'data');
+                let apiData = [];
+                try {
+                    apiData = await loadSupplementalAPIData(city, signal);
+                } catch (error) {
+                    if (error.message === 'AbortError') {
+                        throw new Error('Loading aborted');
+                    }
+                    console.warn(`API data loading failed, continuing with CSV only:`, error.message);
+                    apiData = [];
+                }
+                
+                // Check if aborted after API load
+                if (signal && signal.aborted) {
+                    throw new Error('Loading aborted');
+                }
+                
+                // Step 3: Merge and deduplicate data
+                console.log(`Step 3: Merging CSV (${processedCsvData.length}) and API (${apiData.length}) data`);
+                updateProgress(3, 4, `Merging ${processedCsvData.length + apiData.length} records...`, 'data');
+                
+                // Create a map for deduplication based on business ID and date
+                const dataMap = new Map();
+                
+                // Add CSV data first (lower priority)
+                processedCsvData.forEach(record => {
+                    const key = `${record.businessId}-${record.inspectionDate.toDateString()}`;
+                    dataMap.set(key, record);
+                });
+                
+                // Add API data (higher priority - will overwrite CSV data for same business+date)
+                let apiOverwrites = 0;
+                apiData.forEach(record => {
+                    const key = `${record.businessId}-${record.inspectionDate.toDateString()}`;
+                    if (dataMap.has(key)) {
+                        apiOverwrites++;
+                    }
+                    dataMap.set(key, record);
+                });
+                
+                const mergedData = Array.from(dataMap.values());
+                
+                // Data source breakdown for debugging
+                const csvCount = mergedData.filter(r => r.source === 'csv').length;
+                const apiCount = mergedData.filter(r => r.source === 'api').length;
+                console.log(`Final data breakdown - CSV: ${csvCount}, API: ${apiCount}`);
+                console.log(`Data merged: ${mergedData.length} total records (${apiOverwrites} API overwrites)`);
+                
+                if (mergedData.length === 0) {
+                    throw new Error(`No valid records found for ${city} in ${currentYear}. Data may be from a different year or have mapping issues.`);
+                }
+                
+                // Create spatial index for fast queries
+                console.log('Creating spatial index...');
+                updateProgress(4, 4, `Creating spatial index for ${mergedData.length} records...`, 'data');
+                spatialIndex = createSpatialIndex(mergedData);
+                
+                // Check if aborted after spatial index creation
+                if (signal && signal.aborted) {
+                    throw new Error('Loading aborted');
+                }
+                
+                console.log(`Spatial index created with ${spatialIndex.size} grid cells`);
+                console.log(`Hybrid data loading complete: ${processedCsvData.length} CSV + ${apiData.length} API = ${mergedData.length} total records`);
+                
+                return mergedData;
+                
+            } catch (error) {
+                if (error.message === 'Loading aborted') {
+                    console.log(`Hybrid data loading aborted for ${city}`);
+                    throw new Error('AbortError');
+                }
+                console.error(`Error loading hybrid data for ${city}:`, error);
+                throw error;
+            }
+        }
+
+        // Clear all markers from the map
+        function clearAllMarkers() {
+            clearIndividualMarkers();
+        }
+
+        // Clear only individual markers
+        function clearIndividualMarkers() {
+            individualMarkers.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            individualMarkers = [];
+        }
+
+        // Show progress bar
+        function showProgress(text = 'Loading restaurants...', type = 'markers') {
+            progressContainer.style.display = 'block';
+            progressText.textContent = text;
+            progressBar.style.width = '0%';
+            if (type === 'data') {
+                progressStats.textContent = 'Preparing data...';
+            } else {
+                progressStats.textContent = '0 / 0 markers loaded';
+            }
+        }
+
+        // Update progress bar
+        function updateProgress(current, total, text = null, type = 'markers') {
+            if (text) progressText.textContent = text;
+            const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+            progressBar.style.width = percentage + '%';
+            if (type === 'data') {
+                progressStats.textContent = current > 0 && total > 0 ? `Processing ${current} of ${total} records` : 'Loading data...';
+            } else {
+                progressStats.textContent = `${current} / ${total} markers loaded`;
+            }
+        }
+
+        // Show data loading progress
+        function showDataProgress(text) {
+            showProgress(text, 'data');
+        }
+
+        // Hide progress bar
+        function hideProgress() {
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 500);
+        }
+
+        // Get maximum markers to load based on zoom level
+        function getMaxMarkersForZoom(zoom) {
+            if (zoom >= 16) return 5000;
+            if (zoom >= 14) return 6000;
+            if (zoom >= 12) return 15000;
+            if (zoom >= 10) return 15000;
+            return 15000;
+        }
+
+        // Spatial indexing for faster bounds queries
+        function createSpatialIndex(data) {
+            const gridSize = 0.01;
+            const index = new Map();
+            
+            data.forEach((inspection, idx) => {
+                const gridX = Math.floor(inspection.latitude / gridSize);
+                const gridY = Math.floor(inspection.longitude / gridSize);
+                const key = `${gridX},${gridY}`;
+                
+                if (!index.has(key)) {
+                    index.set(key, []);
+                }
+                index.get(key).push(inspection);
+            });
+            
+            return index;
+        }
+
+        // Fast bounds query using spatial index
+        function queryByBounds(bounds, maxResults = 1000) {
+            if (!spatialIndex) return [];
+            
+            const results = [];
+            const gridSize = 0.01;
+            
+            const minX = Math.floor(bounds.getSouth() / gridSize);
+            const maxX = Math.ceil(bounds.getNorth() / gridSize);
+            const minY = Math.floor(bounds.getWest() / gridSize);
+            const maxY = Math.ceil(bounds.getEast() / gridSize);
+            
+            for (let x = minX; x <= maxX && results.length < maxResults; x++) {
+                for (let y = minY; y <= maxY && results.length < maxResults; y++) {
+                    const key = `${x},${y}`;
+                    const gridData = spatialIndex.get(key);
+                    
+                    if (gridData) {
+                        for (const inspection of gridData) {
+                            if (results.length >= maxResults) break;
+                            if (bounds.contains([inspection.latitude, inspection.longitude])) {
+                                results.push(inspection);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return results;
+        }
+
+        // Priority-based marker selection
+        function prioritizeMarkers(markers, zoom) {
+            return markers.sort((a, b) => {
+                if (a.riskLevel !== b.riskLevel) {
+                    const riskPriority = { 'high': 3, 'medium': 2, 'low': 1 };
+                    return riskPriority[b.riskLevel] - riskPriority[a.riskLevel];
+                }
+                
+                if (a.inspectionDate !== b.inspectionDate) {
+                    return b.inspectionDate - a.inspectionDate;
+                }
+                
+                return b.violationPoints - a.violationPoints;
+            });
+        }
+
+        // Load individual markers for current map view
+        async function loadIndividualMarkersInView() {
+            if (isLoadingIndividualMarkers) return;
+            
+            // Check if map and data are ready
+            if (!map || !inspectionData || inspectionData.length === 0) {
+                console.log('Map or data not ready for marker loading');
+                return;
+            }
+            
+            // Create a unique identifier for this loading session
+            const loadingSessionId = Date.now();
+            const currentLoadingCity = currentCity;
+            
+            isLoadingIndividualMarkers = true;
+            
+            try {
+                const startTime = performance.now();
+                const bounds = map.getBounds();
+                
+                let filteredData;
+                if (spatialIndex) {
+                    const boundsData = queryByBounds(bounds, Number.MAX_SAFE_INTEGER);
+                    filteredData = getFilteredData(boundsData);
+                } else {
+                    filteredData = getFilteredData().filter(inspection => {
+                        return bounds.contains([inspection.latitude, inspection.longitude]);
+                    });
+                }
+
+                // Check if city changed during data filtering
+                if (currentCity !== currentLoadingCity) {
+                    console.log(`City changed during marker loading (${currentLoadingCity} -> ${currentCity}), aborting`);
+                    return;
+                }
+
+                filteredData = prioritizeMarkers(filteredData, currentZoomLevel);
+                console.log(`Loading ALL ${filteredData.length} restaurants in current view`);
+
+                const showProgressBar = filteredData.length > 100;
+                
+                if (showProgressBar) {
+                    showProgress(`Loading ${Math.min(filteredData.length, maxMarkersPerLoad)} restaurants...`);
+                }
+                
+                const removalStartTime = performance.now();
+                individualMarkers = individualMarkers.filter(marker => {
+                    const markerLatLng = marker.getLatLng();
+                    if (!bounds.contains(markerLatLng)) {
+                        map.removeLayer(marker);
+                        return false;
+                    }
+                    return true;
+                });
+                console.log(`Marker removal took: ${performance.now() - removalStartTime}ms`);
+                
+                const existingCoords = new Set(individualMarkers.map(m => `${m.getLatLng().lat},${m.getLatLng().lng}`));
+                
+                const newMarkers = [];
+                let processedCount = 0;
+                const batchSize = 50;
+                
+                for (let i = 0; i < filteredData.length; i += batchSize) {
+                    // Check if city changed during processing
+                    if (currentCity !== currentLoadingCity) {
+                        console.log(`City changed during marker processing, aborting`);
+                        if (showProgressBar) hideProgress();
+                        return;
+                    }
+                    
+                    const batch = filteredData.slice(i, i + batchSize);
+                    
+                    for (const inspection of batch) {
+                        const coordKey = `${inspection.latitude},${inspection.longitude}`;
+                        if (!existingCoords.has(coordKey)) {
+                            const marker = createSingleIndividualMarker(inspection);
+                            newMarkers.push(marker);
+                            processedCount++;
+                        }
+                    }
+                    
+                    if (showProgressBar) {
+                        updateProgress(i + batch.length, filteredData.length);
+                        await new Promise(resolve => setTimeout(resolve, 1));
+                    }
+                }
+                
+                // Final check before adding markers
+                if (currentCity !== currentLoadingCity) {
+                    console.log(`City changed before adding markers, cleaning up`);
+                    newMarkers.forEach(marker => map.removeLayer(marker));
+                    if (showProgressBar) hideProgress();
+                    return;
+                }
+                
+                individualMarkers.push(...newMarkers);
+                
+                if (showProgressBar) {
+                    updateProgress(filteredData.length, filteredData.length, 
+                        `${newMarkers.length} restaurants loaded!`);
+                    hideProgress();
+                }
+                
+                updateMapStats();
+                
+                const totalTime = performance.now() - startTime;
+                console.log(`Total loading time: ${totalTime}ms for ${newMarkers.length} markers`);
+                
+            } finally {
+                isLoadingIndividualMarkers = false;
+            }
+        }
+
+        // Create a single individual marker
+        function createSingleIndividualMarker(inspection) {
+            const lat = inspection.latitude;
+            const lng = inspection.longitude;
+            
+            const marker = L.circleMarker([lat, lng], {
+                radius: 3,
+                fillColor: getRiskColor(inspection.riskLevel),
+                color: getRiskBorderColor(inspection.riskLevel),
+                weight: 0.3, 
+                opacity: 0.3,
+                fillOpacity: 0.1 
+            });
+
+            marker.bindPopup(createIndividualPopupContent(inspection));
+            marker.addTo(map);
+            
+            return marker;
+        }
+
+        // Populate filter dropdowns (simplified - no filters needed)
+        function populateFilters() {
+            console.log('Data loaded successfully');
+        }
+
+        // Create popup content for individual restaurant markers
+        function createIndividualPopupContent(inspection) {
+            const inspectionDate = inspection.inspectionDate.toLocaleDateString();
+            const riskColor = getRiskColor(inspection.riskLevel);
+            const gradeColor = inspection.grade ? getGradeColor(inspection.grade) : '#9e9e9e';
+            const sourceIcon = inspection.source === 'api' ? '🔴' : '🟡';
+            const sourceText = inspection.source === 'api' ? 'Live API' : 'CSV Data';
+            
+            return `
+                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 300px; margin: 0; padding: 0; background: transparent;">
+                    <!-- Header with restaurant name -->
+                    <div style="background: linear-gradient(135deg, #007cba, #005a87); color: white; padding: 15px; margin: 0; border-radius: 8px 8px 0 0;">
+                        <h3 style="margin: 0; font-size: 16px; font-weight: bold; line-height: 1.3;">${inspection.name}</h3>
+                        <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 12px;">📍 ${inspection.address}</p>
+                        <p style="margin: 5px 0 0 0; opacity: 0.7; font-size: 10px;">${sourceIcon} ${sourceText}</p>
+                    </div>
+                    
+                    <!-- Risk and Grade badges -->
+                    <div style="display: flex; gap: 8px; margin: 0; padding: 15px; align-items: center; background: white;">
+                        <div style="background: ${riskColor}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                            ${inspection.riskLevel} Risk
+                        </div>
+                        ${inspection.grade ? `
+                        <div style="background: ${gradeColor}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">
+                            Grade ${inspection.grade}
+                        </div>` : ''}
+                    </div>
+                    
+                    <!-- Inspection details grid -->
+                    <div style="display: grid; gap: 8px; margin: 0; padding: 0 15px 15px 15px; background: white;">
+                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.1);">
+                            <span style="color: #666; font-size: 12px; font-weight: 500;">📅 Inspection Date</span>
+                            <span style="font-size: 12px; font-weight: bold;">${inspectionDate}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.1);">
+                            <span style="color: #666; font-size: 12px; font-weight: 500;">🔍 Type</span>
+                            <span style="font-size: 12px; font-weight: bold;">${inspection.inspectionType}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.1);">
+                            <span style="color: #666; font-size: 12px; font-weight: 500;">⚠️ Violation Points</span>
+                            <span style="font-size: 12px; font-weight: bold; color: ${riskColor};">${inspection.violationPoints}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                            <span style="color: #666; font-size: 12px; font-weight: 500;">📋 Result</span>
+                            <span style="font-size: 12px; font-weight: bold;">${inspection.inspectionResult}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer with additional info -->
+                    <div style="background: #f8f9fa; padding: 8px 15px; margin: 0; border-radius: 0 0 8px 8px; text-align: center;">
+                        <p style="margin: 0; font-size: 10px; color: #666;">Business ID: ${inspection.businessId || 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Get filtered data based on current filters
+        function getFilteredData(dataToFilter = null) {
+            const dataSource = dataToFilter || allData;
+            if (currentFilters.type === 'all' && !currentFilters.startDate && !currentFilters.endDate) {
+                return dataSource;
+            }
+            return dataSource.filter(row => {
+                if (currentFilters.type !== 'all' && row.sourceFile !== currentFilters.type) return false;
+                // Optionally add date filtering if your data has a date column
+                return true;
+            });
+        }
+
+        // Show general map statistics
+        function updateMapStats() {
+            const statsContent = document.getElementById('statsContent');
+            const filteredData = getFilteredData();
+            
+            if (filteredData.length === 0) {
+                statsContent.innerHTML = '<p style="color: #666; font-style: italic;">No data matches current filters</p>';
+                return;
+            }
+
+            // Data source breakdown
+            const sourceDistribution = {};
+            filteredData.forEach(d => {
+                if (d.sourceFile) {
+                    const fileName = d.sourceFile.replace('data/', '').replace('.csv', '');
+                    sourceDistribution[fileName] = (sourceDistribution[fileName] || 0) + 1;
+                }
+            });
+
+            const sourceDistributionHtml = Object.entries(sourceDistribution)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([source, count]) => 
+                    `<div class="stat-item">
+                        <span class="stat-label">${source}:</span>
+                        <span>${count.toLocaleString()} records</span>
+                    </div>`
+                ).join('');
+
+            // Try to find year distribution if Year column exists
+            let yearDistributionHtml = '';
+            const years = [...new Set(filteredData.map(d => d.Year).filter(y => y))];
+            if (years.length > 0) {
+                const yearCounts = {};
+                filteredData.forEach(d => {
+                    if (d.Year) {
+                        yearCounts[d.Year] = (yearCounts[d.Year] || 0) + 1;
+                    }
+                });
+                
+                yearDistributionHtml = `
+                    <h5 style="margin: 20px 0 10px 0;">Year Distribution:</h5>
+                    ${Object.entries(yearCounts)
+                        .sort(([a], [b]) => b.localeCompare(a))
+                        .slice(0, 5) // Show top 5 years
+                        .map(([year, count]) => 
+                            `<div class="stat-item">
+                                <span class="stat-label">${year}:</span>
+                                <span>${count.toLocaleString()} records</span>
+                            </div>`
+                        ).join('')}
+                `;
+            }
+
+            statsContent.innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Total Records:</span>
+                    <span>${filteredData.length.toLocaleString()}</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">Data Sources:</span>
+                    <span>${Object.keys(sourceDistribution).length} files</span>
+                </div>
+                
+                <h5 style="margin: 20px 0 10px 0;">Records by Source:</h5>
+                ${sourceDistributionHtml}
+                
+                ${yearDistributionHtml}
+            `;
+        }
+
+        // Set up filter event listeners (simplified - no filters)
+        function setupFilterListeners() {
+            // No filters to set up
+        }
+
+        // Apply filters to the map
+        function applyFilters() {
+            currentFilters = {
+                inspectionType: document.getElementById('inspectionTypeFilter').value,
+                grade: document.getElementById('gradeFilter').value,
+                risk: document.getElementById('riskFilter').value,
+                startDate: document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null,
+                endDate: document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null
+            };
+
+            showProgress('Applying filters...');
+            clearAllMarkers();
+            
+            setTimeout(() => {
+                loadIndividualMarkersInView();
+            }, 100);
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeMap();
+            loadData();
+            initializeRefineries();
+        });
+
+        // Refinery data and functionality
+        const refineries = [
+            {
+                name: "Ras Tanura Refinery",
+                company: "Saudi Aramco",
+                capacity: 550,
+                lat: 26.7114,
+                lng: 50.1668,
+                location: "Eastern Province",
+                description: "One of the largest refineries in Saudi Arabia, located on the Persian Gulf coast"
+            },
+            {
+                name: "YASREF Refinery",
+                company: "Saudi Aramco",
+                capacity: 430,
+                lat: 21.4326,
+                lng: 39.8264,
+                location: "Yanbu",
+                description: "Major refinery on the Red Sea coast"
+            },
+            {
+                name: "Jazan Refinery",
+                company: "Saudi Aramco",
+                capacity: 400,
+                lat: 16.8892,
+                lng: 42.5511,
+                location: "Jazan",
+                description: "Modern refinery in the southern region"
+            },
+            {
+                name: "SAMREF Refinery",
+                company: "Saudi Aramco & Mobil",
+                capacity: 400,
+                lat: 26.2787,
+                lng: 50.1995,
+                location: "Jubail",
+                description: "Joint venture refinery in Jubail Industrial City"
+            },
+            {
+                name: "Petro Rabigh Refinery",
+                company: "Saudi Aramco & Petrola",
+                capacity: 400,
+                lat: 22.7996,
+                lng: 39.0411,
+                location: "Rabigh",
+                description: "Integrated refinery and petrochemical complex"
+            },
+            {
+                name: "SATORP Refinery",
+                company: "Saudi Aramco & Total",
+                capacity: 460,
+                lat: 26.2968,
+                lng: 50.1357,
+                location: "Jubail",
+                description: "Joint venture with Total in Jubail"
+            },
+            {
+                name: "SASREF Refinery",
+                company: "Saudi Aramco & Shell",
+                capacity: 305,
+                lat: 26.2800,
+                lng: 50.1900,
+                location: "Jubail",
+                description: "Joint venture with Shell in Jubail"
+            },
+            {
+                name: "Yanbu Refinery",
+                company: "Saudi Aramco",
+                capacity: 220,
+                lat: 24.0889,
+                lng: 38.0617,
+                location: "Yanbu",
+                description: "Red Sea coast refinery"
+            },
+            {
+                name: "Riyadh Refinery",
+                company: "Saudi Aramco",
+                capacity: 126,
+                lat: 24.7136,
+                lng: 46.6753,
+                location: "Riyadh",
+                description: "Capital city refinery serving central region"
+            }
+        ];
+
+        let refineryMarkers = [];
+
+        async function initializeRefineries() {
+            await loadRefineryCapacityData();
+            populateRefineryList();
+            addRefineryMarkersToMap();
+        }
+
+        async function loadRefineryCapacityData() {
+            try {
+                const data = await d3.csv('data/Refinery capacities csv.csv');
+                refineryCapacityData = data.map(d => ({
+                    name: d['Name of The Refinery'].trim(),
+                    year: parseInt(d['Year']),
+                    capacity: parseFloat(d['Capacity  (1,000 b/cd)'])
+                }));
+                console.log('Loaded refinery capacity data:', refineryCapacityData.length, 'records');
+            } catch (error) {
+                console.error('Failed to load refinery capacity data:', error);
+            }
+        }
+
+        function getRefineryCapacityHistory(refineryName) {
+            // Clean refinery name for matching
+            const cleanName = refineryName.trim();
+            
+            // Get capacity data for this refinery
+            const refineryData = refineryCapacityData.filter(d => 
+                d.name.includes(cleanName.split(' ')[0]) || cleanName.includes(d.name.split(' ')[0])
+            );
+            
+            // Sort by year and return
+            return refineryData.sort((a, b) => a.year - b.year);
+        }
+
+        function createCapacityChart(refineryName, containerId) {
+            const data = getRefineryCapacityHistory(refineryName);
+            
+            if (data.length === 0) return null;
+            
+            const years = data.map(d => d.year);
+            const capacities = data.map(d => d.capacity);
+            
+            const ctx = document.getElementById(containerId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: 'Capacity (thousand b/cd)',
+                        data: capacities,
+                        borderColor: 'rgba(255, 255, 255, 0.9)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 0,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        pointBorderColor: 'rgba(255, 255, 255, 1)',
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.2)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.8)',
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.2)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.8)',
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function populateRefineryList() {
+            const refineryList = document.getElementById('refineryList');
+            
+            // Calculate total capacity dynamically
+            const totalCapacity = refineries.reduce((sum, refinery) => sum + refinery.capacity, 0);
+            document.getElementById('totalCapacity').textContent = totalCapacity.toLocaleString() + ' thousand';
+            
+            refineries.forEach((refinery, index) => {
+                const refineryDiv = document.createElement('div');
+                refineryDiv.className = 'refinery-item';
+                refineryDiv.innerHTML = `
+                    <div class="refinery-name">${refinery.name}</div>
+                    <div class="refinery-company">${refinery.company}</div>
+                    <div class="refinery-capacity">${refinery.capacity.toLocaleString()} k b/cd</div>
+                    <div class="refinery-location">📍 ${refinery.location}</div>
+                `;
+                
+                refineryDiv.addEventListener('click', () => {
+                    zoomToRefinery(refinery);
+                });
+                
+                refineryList.appendChild(refineryDiv);
+            });
+        }
+
+        // Create arrow above emoji with dramatic height differences and translucent fill
+        function createRefineryWithArrow(refinery) {
+            const maxCapacity = Math.max(...refineries.map(r => r.capacity));
+            const minArrowHeight = 8;
+            const maxArrowHeight = 90; // Much larger range for contrast
+            const arrowHeight = minArrowHeight + ((refinery.capacity / maxCapacity) * (maxArrowHeight - minArrowHeight));
+            
+            return `
+                <div class="refinery-with-arrow">
+                    <svg width="12" height="${arrowHeight + 5}" style="margin-bottom: 2px;">
+                        <polygon points="6,0 10,${arrowHeight} 2,${arrowHeight}" 
+                                 fill="rgba(25, 118, 210, 0.4)" 
+                                 stroke="#1976D2" 
+                                 stroke-width="1"/>
+                    </svg>
+                    <div class="refinery-emoji">🛢️</div>
+                </div>
+            `;
+        }
+
+        function addRefineryMarkersToMap() {
+            const tooltip = document.getElementById('refineryTooltip');
+            
+            refineries.forEach(refinery => {
+                const refineryIcon = L.divIcon({
+                    html: createRefineryWithArrow(refinery),
+                    iconSize: [50, 80],
+                    iconAnchor: [25, 75],
+                    className: 'refinery-marker'
+                });
+
+                const marker = L.marker([refinery.lat, refinery.lng], {icon: refineryIcon}).addTo(map);
+                
+                const chartId = `chart-${refinery.name.replace(/\s+/g, '-').toLowerCase()}`;
+                const hasChartData = getRefineryCapacityHistory(refinery.name).length > 0;
+                
+                const popupContent = `
+                    <div style="font-family: Arial, sans-serif; min-width: 280px; background: linear-gradient(135deg, rgba(30, 64, 175, 0.95), rgba(30, 58, 138, 0.95)); color: white; padding: 24px; margin: -10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
+                        <h3 style="margin: 0 0 16px 0; color: white; font-size: 16px; font-weight: bold;">${refinery.name}</h3>
+                        <div style="margin: 10px 0; font-size: 13px; opacity: 0.9;"><strong>Company:</strong> ${refinery.company}</div>
+                        <div style="margin: 10px 0; font-size: 13px; opacity: 0.9;"><strong>Location:</strong> ${refinery.location}</div>
+                        <div style="margin: 10px 0; font-size: 13px; opacity: 0.9;"><strong>Current Capacity:</strong> ${refinery.capacity.toLocaleString()} thousand b/cd</div>
+                        ${hasChartData ? `
+                        <div style="margin: 16px 0; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+                            <div style="font-size: 12px; margin-bottom: 8px; opacity: 0.9; font-weight: bold;">Capacity History</div>
+                            <div style="height: 120px; position: relative;">
+                                <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+                            </div>
+                        </div>` : ''}
+                        <div style="margin: 16px 0 0 0; font-size: 12px; opacity: 0.8; line-height: 1.4; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid rgba(255,255,255,0.4);">${refinery.description}</div>
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent);
+                
+                // Create chart when popup opens and disable bounds viscosity
+                marker.on('popupopen', function() {
+                    // Temporarily remove bounds entirely for better popup viewing
+                    map.setMaxBounds(null);
+                    
+                    const hasChartData = getRefineryCapacityHistory(refinery.name).length > 0;
+                    if (hasChartData) {
+                        setTimeout(() => {
+                            createCapacityChart(refinery.name, chartId);
+                        }, 100); // Small delay to ensure DOM is ready
+                    }
+                });
+                
+                // Re-enable bounds when popup closes
+                marker.on('popupclose', function() {
+                    // Re-enable bounds with expanded GCC region and viscosity
+                    const gccBounds = [
+                        [7.0, 29.0], // Southwest - offset by 5 degrees
+                        [37.0, 66.0] // Northeast - offset by 5 degrees
+                    ];
+                    map.setMaxBounds(gccBounds);
+                    map.options.maxBoundsViscosity = 1.0;
+                    
+                    // Force map to fit within bounds if currently outside
+                    if (!gccBounds[0] || !gccBounds[1] || !map.getBounds().intersects(L.latLngBounds(gccBounds))) {
+                        map.fitBounds(gccBounds, { animate: true, duration: 0.5 });
+                    }
+                });
+                
+                // Add hover events for tooltip
+                marker.on('mouseover', function(e) {
+                    const tooltipContent = `
+                        <div style="font-weight: bold; margin-bottom: 4px;">${refinery.name}</div>
+                        <div style="font-size: 11px; opacity: 0.9;">${refinery.capacity.toLocaleString()} k b/cd</div>
+                        <div style="font-size: 10px; opacity: 0.8;">📍 ${refinery.location}</div>
+                    `;
+                    tooltip.innerHTML = tooltipContent;
+                    tooltip.classList.add('visible');
+                });
+                
+                marker.on('mouseout', function(e) {
+                    tooltip.classList.remove('visible');
+                });
+                
+                marker.on('mousemove', function(e) {
+                    const mouseX = e.originalEvent.clientX;
+                    const mouseY = e.originalEvent.clientY;
+                    tooltip.style.left = (mouseX + 10) + 'px';
+                    tooltip.style.top = (mouseY - 50) + 'px';
+                });
+                
+                refineryMarkers.push(marker);
+            });
+        }
+
+        function zoomToRefinery(refinery) {
+            map.setView([refinery.lat, refinery.lng], 10);
+            // Find and open the popup for this refinery
+            const marker = refineryMarkers.find(m => 
+                m.getLatLng().lat === refinery.lat && m.getLatLng().lng === refinery.lng
+            );
+            if (marker) {
+                marker.openPopup();
+            }
+        }
+
+        function toggleRefinerySection() {
+            const content = document.getElementById('refineryContent');
+            const toggle = document.getElementById('refineryToggle');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+            } else {
+                content.classList.add('expanded');
+                toggle.classList.add('expanded');
+            }
+        }
+
+        // Refresh data manually
+        async function refreshData() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '🔄 Checking for updates...';
+            
+            try {
+                await loadData();
+                
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Refresh Data';
+            }
+        }
+
+        // Production vs Demand Chart Functions
+        let productionData = [];
+        let demandData = [];
+        let productionDemandChart = null;
+
+        // Load production data
+        async function loadProductionData() {
+            try {
+                const data = await d3.csv('data/Production of Refined Products csv.csv');
+                console.log('Production data loaded:', data.length, 'rows');
+                return data.filter(d => d.Country && d.Country.trim() === 'Saudi Arabia' && d.Product === 'Total oil products')
+                          .map(d => ({
+                              year: +d.Year,
+                              month: d.Month,
+                              value: +d.Value,
+                              date: new Date(+d.Year, getMonthNumber(d.Month) - 1)
+                          }))
+                          .filter(d => !isNaN(d.value) && d.value > 0)
+                          .sort((a, b) => a.date - b.date);
+            } catch (error) {
+                console.error('Error loading production data:', error);
+                return [];
+            }
+        }
+
+        // Load demand data
+        async function loadDemandData() {
+            try {
+                const data = await d3.csv('data/refined products demand csv.csv');
+                console.log('Demand data loaded:', data.length, 'rows');
+                return data.filter(d => d['Country '] && d['Country '].trim() === 'Saudi Arabia' && d.Product === 'Total oil products')
+                          .map(d => ({
+                              year: +d.Year,
+                              month: d.Month,
+                              value: +d.Value,
+                              date: new Date(+d.Year, getMonthNumber(d.Month) - 1)
+                          }))
+                          .filter(d => !isNaN(d.value) && d.value > 0)
+                          .sort((a, b) => a.date - b.date);
+            } catch (error) {
+                console.error('Error loading demand data:', error);
+                return [];
+            }
+        }
+
+        // Load exports data
+        async function loadExportsData() {
+            try {
+                // Load both exports files
+                const [historicalData, data2024] = await Promise.all([
+                    d3.csv('data/Exports of Refined products csv.csv'),
+                    d3.csv('data/Exports of Refined Products 2024 csv.csv')
+                ]);
+
+                console.log('Historical exports data loaded:', historicalData.length, 'rows');
+                console.log('2024 exports data loaded:', data2024.length, 'rows');
+
+                // Process historical data (original format)
+                const historical = historicalData.filter(d => d['Country '] && d['Country '].trim() === 'Saudi Arabia' && d.Product === 'Total oil products')
+                                                 .map(d => ({
+                                                     year: +d.Year,
+                                                     month: d.Month,
+                                                     value: +d.Value,
+                                                     date: new Date(+d.Year, getMonthNumber(d.Month) - 1)
+                                                 }))
+                                                 .filter(d => !isNaN(d.value) && d.value > 0);
+
+                // Process 2024 data (new format)
+                const data2024Processed = data2024.filter(d => d.Country && d.Country.trim() === 'Saudi Arabia')
+                                                  .map(d => {
+                                                      const dateParts = d.Date.split('-');
+                                                      const month = dateParts[0];
+                                                      const year = 2000 + parseInt(dateParts[1]);
+                                                      return {
+                                                          year: year,
+                                                          month: month,
+                                                          value: +d.Exports,
+                                                          date: new Date(year, getMonthNumber(month) - 1)
+                                                      };
+                                                  })
+                                                  .filter(d => !isNaN(d.value) && d.value > 0);
+
+                // Combine both datasets
+                const combined = [...historical, ...data2024Processed]
+                                .sort((a, b) => a.date - b.date);
+
+                console.log('Combined exports data:', combined.length, 'total records');
+                return combined;
+
+            } catch (error) {
+                console.error('Error loading exports data:', error);
+                return [];
+            }
+        }
+
+        // Convert month name to number
+        function getMonthNumber(monthName) {
+            const months = {
+                'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+            };
+            return months[monthName] || 1;
+        }
+
+        // Calculate statistics
+        function calculateProductionStats(production, demand) {
+            const avgProduction = production.reduce((sum, d) => sum + d.value, 0) / production.length;
+            const avgDemand = demand.reduce((sum, d) => sum + d.value, 0) / demand.length;
+            const avgSurplus = avgProduction - avgDemand;
+            
+            const latestProduction = production[production.length - 1]?.value || 0;
+            const latestDemand = demand[demand.length - 1]?.value || 0;
+            const currentSurplus = latestProduction - latestDemand;
+
+            return {
+                avgProduction: Math.round(avgProduction),
+                avgDemand: Math.round(avgDemand),
+                avgSurplus: Math.round(avgSurplus),
+                currentSurplus: Math.round(currentSurplus)
+            };
+        }
+
+        // Aggregate monthly data by year (calculate average for each year)
+        function aggregateDataByYear(monthlyData) {
+            const yearGroups = {};
+            
+            // Group data by year
+            monthlyData.forEach(d => {
+                if (!yearGroups[d.year]) {
+                    yearGroups[d.year] = [];
+                }
+                yearGroups[d.year].push(d.value);
+            });
+            
+            // Calculate average for each year
+            const yearlyData = Object.keys(yearGroups)
+                .map(year => ({
+                    year: parseInt(year),
+                    value: Math.round(yearGroups[year].reduce((sum, val) => sum + val, 0) / yearGroups[year].length)
+                }))
+                .sort((a, b) => a.year - b.year);
+            
+            return yearlyData;
+        }
+
+        // Update statistics display
+        function updateProductionStats(stats) {
+            document.getElementById('avgProduction').textContent = stats.avgProduction.toLocaleString();
+            document.getElementById('avgDemand').textContent = stats.avgDemand.toLocaleString();
+            
+            const avgSurplusElement = document.getElementById('avgSurplus');
+            avgSurplusElement.textContent = (stats.avgSurplus >= 0 ? '+' : '') + stats.avgSurplus.toLocaleString();
+            avgSurplusElement.style.color = stats.avgSurplus >= 0 ? '#00be9d' : '#f44336';
+            
+            const currentSurplusElement = document.getElementById('currentSurplus');
+            currentSurplusElement.textContent = (stats.currentSurplus >= 0 ? '+' : '') + stats.currentSurplus.toLocaleString();
+            currentSurplusElement.style.color = stats.currentSurplus >= 0 ? '#00be9d' : '#f44336';
+        }
+
+        // Create the production vs demand chart
+        function createProductionDemandChart(production, demand, exports) {
+            const ctx = document.getElementById('productionDemandChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (productionDemandChart) {
+                productionDemandChart.destroy();
+            }
+
+            // Aggregate monthly data by year
+            const yearlyProduction = aggregateDataByYear(production);
+            const yearlyDemand = aggregateDataByYear(demand);
+            const yearlyExports = exports ? aggregateDataByYear(exports) : [];
+
+            const labels = yearlyProduction.map(d => `'${d.year.toString().slice(-2)}`);
+
+            const datasets = [
+                {
+                    label: 'Production',
+                    data: yearlyProduction.map(d => d.value),
+                    borderColor: '#2E7D32',
+                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: '#2E7D32',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 0.5,
+                    pointRadius: 1,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Demand',
+                    data: yearlyDemand.map(d => d.value),
+                    borderColor: '#D32F2F',
+                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: '#D32F2F',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 0.5,
+                    pointRadius: 1,
+                    pointHoverRadius: 4
+                }
+            ];
+
+            // Add exports dataset if available
+            if (exports && yearlyExports.length > 0) {
+                datasets.push({
+                    label: 'Exports',
+                    data: yearlyExports.map(d => d.value),
+                    borderColor: '#1976D2',
+                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: '#1976D2',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 0.5,
+                    pointRadius: 1,
+                    pointHoverRadius: 4
+                });
+            }
+
+            productionDemandChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: false,
+                                boxWidth: 20,
+                                boxHeight: 1,
+                                padding: 20,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#1976D2',
+                            borderWidth: 1,
+                            cornerRadius: 6,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} kb/d`;
+                                },
+                                afterBody: function(context) {
+                                    if (context.length >= 2) {
+                                        const production = context.find(c => c.datasetIndex === 0)?.parsed.y || 0;
+                                        const demand = context.find(c => c.datasetIndex === 1)?.parsed.y || 0;
+                                        const exports = context.find(c => c.datasetIndex === 2)?.parsed.y || 0;
+                                        const surplus = production - demand;
+                                        
+                                        const result = [``, `Surplus: ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} kb/d`];
+                                        
+                                        if (exports > 0) {
+                                            result.push(`Net Domestic Use: ${(demand - exports).toLocaleString()} kb/d`);
+                                        }
+                                        
+                                        return result;
+                                    }
+                                    return [];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Year',
+                                font: {
+                                    size: 11
+                                },
+                                color: '#1976D2'
+                            },
+                            ticks: {
+                                maxTicksLimit: 15,
+                                maxRotation: 0,
+                                color: '#666666',
+                                font: {
+                                    size: 9
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Volume (kb/d)',
+                                font: {
+                                    size: 11
+                                },
+                                color: '#1976D2'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                },
+                                color: '#666666',
+                                font: {
+                                    size: 9
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize production vs demand dashboard
+        async function initializeProductionDemand() {
+            try {
+                // Load all datasets
+                const [production, demand, exports] = await Promise.all([
+                    loadProductionData(),
+                    loadDemandData(),
+                    loadExportsData()
+                ]);
+
+                productionData = production;
+                demandData = demand;
+
+                if (production.length === 0 || demand.length === 0) {
+                    console.error('Failed to load production or demand data');
+                    return;
+                }
+
+                // Calculate and display statistics
+                const stats = calculateProductionStats(production, demand);
+                updateProductionStats(stats);
+
+                // Create the chart with exports data
+                createProductionDemandChart(production, demand, exports);
+
+            } catch (error) {
+                console.error('Error initializing production vs demand dashboard:', error);
+            }
+        }
+
+        // Initialize production vs demand when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add a delay to ensure map loads first
+            setTimeout(initializeProductionDemand, 1000);
+        });
+    </script>
+</body>
+</html>

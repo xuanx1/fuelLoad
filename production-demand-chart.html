@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saudi Arabia: Production vs Demand Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 1.1em;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            padding: 40px;
+        }
+        
+        #chart {
+            height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🇸🇦 Saudi Arabia's Energy</h1>
+        <div class="subtitle">Refined Products: Production vs Demand</div>
+        
+        <div class="stats-grid" id="statsGrid">
+            <div class="loading">Loading data...</div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="chart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let productionData = [];
+        let demandData = [];
+        let chart = null;
+
+        // Load production data
+        async function loadProductionData() {
+            try {
+                const data = await d3.csv('data/Production of Refined Products csv.csv');
+                console.log('Production data loaded:', data.length, 'rows');
+                return data.filter(d => d.Country && d.Country.trim() === 'Saudi Arabia' && d.Product === 'Total oil products')
+                          .map(d => ({
+                              year: +d.Year,
+                              month: d.Month,
+                              value: +d.Value,
+                              date: new Date(+d.Year, getMonthNumber(d.Month) - 1)
+                          }))
+                          .filter(d => !isNaN(d.value) && d.value > 0)
+                          .sort((a, b) => a.date - b.date);
+            } catch (error) {
+                console.error('Error loading production data:', error);
+                return [];
+            }
+        }
+
+        // Load demand data
+        async function loadDemandData() {
+            try {
+                const data = await d3.csv('data/refined products demand csv.csv');
+                console.log('Demand data loaded:', data.length, 'rows');
+                return data.filter(d => d['Country '] && d['Country '].trim() === 'Saudi Arabia' && d.Product === 'Total oil products')
+                          .map(d => ({
+                              year: +d.Year,
+                              month: d.Month,
+                              value: +d.Value,
+                              date: new Date(+d.Year, getMonthNumber(d.Month) - 1)
+                          }))
+                          .filter(d => !isNaN(d.value) && d.value > 0)
+                          .sort((a, b) => a.date - b.date);
+            } catch (error) {
+                console.error('Error loading demand data:', error);
+                return [];
+            }
+        }
+
+        // Convert month name to number
+        function getMonthNumber(monthName) {
+            const months = {
+                'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+            };
+            return months[monthName] || 1;
+        }
+
+        // Calculate statistics
+        function calculateStats(production, demand) {
+            const avgProduction = production.reduce((sum, d) => sum + d.value, 0) / production.length;
+            const avgDemand = demand.reduce((sum, d) => sum + d.value, 0) / demand.length;
+            const avgSurplus = avgProduction - avgDemand;
+            
+            const latestProduction = production[production.length - 1]?.value || 0;
+            const latestDemand = demand[demand.length - 1]?.value || 0;
+            const currentSurplus = latestProduction - latestDemand;
+
+            return {
+                avgProduction: Math.round(avgProduction),
+                avgDemand: Math.round(avgDemand),
+                avgSurplus: Math.round(avgSurplus),
+                latestProduction: Math.round(latestProduction),
+                latestDemand: Math.round(latestDemand),
+                currentSurplus: Math.round(currentSurplus)
+            };
+        }
+
+        // Update statistics display
+        function updateStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.avgProduction.toLocaleString()}</div>
+                    <div class="stat-label">Average Production (kb/d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.avgDemand.toLocaleString()}</div>
+                    <div class="stat-label">Average Demand (kb/d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: ${stats.avgSurplus >= 0 ? '#4CAF50' : '#f44336'}">${stats.avgSurplus >= 0 ? '+' : ''}${stats.avgSurplus.toLocaleString()}</div>
+                    <div class="stat-label">Average Surplus (kb/d)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: ${stats.currentSurplus >= 0 ? '#4CAF50' : '#f44336'}">${stats.currentSurplus >= 0 ? '+' : ''}${stats.currentSurplus.toLocaleString()}</div>
+                    <div class="stat-label">Latest Surplus (kb/d)</div>
+                </div>
+            `;
+        }
+
+        // Create the chart
+        function createChart(production, demand) {
+            const ctx = document.getElementById('chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (chart) {
+                chart.destroy();
+            }
+
+            const labels = production.map(d => `${d.month} ${d.year}`);
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Production (Refinery Output)',
+                            data: production.map(d => d.value),
+                            borderColor: '#2E7D32',
+                            backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#2E7D32',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 1,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Demand',
+                            data: demand.map(d => d.value),
+                            borderColor: '#D32F2F',
+                            backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointBackgroundColor: '#D32F2F',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 1,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Saudi Arabia: Refined Products Production vs Demand',
+                            font: {
+                                size: 18,
+                                weight: 'bold'
+                            },
+                            color: '#1976D2',
+                            padding: 20
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#1976D2',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} kb/d`;
+                                },
+                                afterBody: function(context) {
+                                    if (context.length === 2) {
+                                        const production = context.find(c => c.datasetIndex === 0)?.parsed.y || 0;
+                                        const demand = context.find(c => c.datasetIndex === 1)?.parsed.y || 0;
+                                        const surplus = production - demand;
+                                        return [``, `Surplus: ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} kb/d`];
+                                    }
+                                    return [];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time Period',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#1976D2'
+                            },
+                            ticks: {
+                                maxTicksLimit: 20,
+                                color: '#666666'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Volume (Thousand Barrels per Day)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#1976D2'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString() + ' kb/d';
+                                },
+                                color: '#666666'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize the dashboard
+        async function init() {
+            try {
+                // Load both datasets
+                const [production, demand] = await Promise.all([
+                    loadProductionData(),
+                    loadDemandData()
+                ]);
+
+                productionData = production;
+                demandData = demand;
+
+                if (production.length === 0 || demand.length === 0) {
+                    document.getElementById('statsGrid').innerHTML = '<div class="loading">Error loading data. Please check file paths.</div>';
+                    return;
+                }
+
+                // Calculate and display statistics
+                const stats = calculateStats(production, demand);
+                updateStats(stats);
+
+                // Create the chart
+                createChart(production, demand);
+
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                document.getElementById('statsGrid').innerHTML = '<div class="loading">Error loading data. Please check file paths.</div>';
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
