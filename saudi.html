@@ -671,8 +671,77 @@
             min-height: 250px;
         }
 
-        #productionDemandChart {
+        #productionDemandChart, #naturalGasChart {
             height: 100% !important;
+        }
+
+        /* Energy Data Navigation Controls */
+        .energy-nav-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .title-section {
+            flex: 1;
+            text-align: center;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            flex-shrink: 0;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        .nav-btn:active {
+            transform: scale(0.95);
+        }
+
+        .energy-indicator {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 5px;
+        }
+
+        .indicator-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .indicator-dot.active {
+            background: rgba(255, 255, 255, 0.9);
+            transform: scale(1.5);
+        }
+
+        .energy-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
     </style>
 </head>
@@ -706,31 +775,73 @@
     <div class="production-demand-section">
         <div class="production-demand-container">
             <div class="production-demand-header">
-                <div class="production-demand-title">Production vs Demand</div>
-                <div class="production-demand-subtitle">Refined Products</div>
-            </div>
-            
-            <div class="stats-grid" id="productionStatsGrid">
-                <div class="stat-card">
-                    <div class="stat-value" id="avgProduction">Loading...</div>
-                    <div class="stat-label">Avg Production (kb/d)</div>
+                <!-- Navigation Controls for Cycling -->
+                <div class="energy-nav-controls">
+                    <button class="nav-btn" id="prevEnergyBtn">◀</button>
+                    <div class="title-section">
+                        <div class="production-demand-title" id="energyDataTitle">Refined Petroleum</div>
+                        <div class="production-demand-subtitle" id="energyDataSubtitle">Production, Demand & Exports</div>
+                    </div>
+                    <button class="nav-btn" id="nextEnergyBtn">▶</button>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="avgDemand">Loading...</div>
-                    <div class="stat-label">Avg Demand (kb/d)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="avgSurplus">Loading...</div>
-                    <div class="stat-label">Avg Surplus (kb/d)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="currentSurplus">Loading...</div>
-                    <div class="stat-label">Latest Surplus (kb/d)</div>
+                
+                <!-- Indicator dots below title -->
+                <div class="energy-indicator">
+                    <span class="indicator-dot active" data-page="0"></span>
+                    <span class="indicator-dot" data-page="1"></span>
                 </div>
             </div>
             
-            <div class="chart-container">
-                <canvas id="productionDemandChart"></canvas>
+            <!-- Refined Products Page -->
+            <div class="energy-page" id="refinedProductsPage">
+                <div class="stats-grid" id="productionStatsGrid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgProduction">Loading...</div>
+                        <div class="stat-label">Avg Production (kb/d)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgDemand">Loading...</div>
+                        <div class="stat-label">Avg Demand (kb/d)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgSurplus">Loading...</div>
+                        <div class="stat-label">Avg Surplus (kb/d)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="currentSurplus">Loading...</div>
+                        <div class="stat-label">Latest Surplus (kb/d)</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="productionDemandChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Natural Gas Page -->
+            <div class="energy-page" id="naturalGasPage" style="display: none;">
+                <div class="stats-grid" id="naturalGasStatsGrid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgGasProduction">Loading...</div>
+                        <div class="stat-label">Avg Production (MMSCFD)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgGasConsumption">Loading...</div>
+                        <div class="stat-label">Avg Consumption (MMSCFD)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="currentGasReserves">Loading...</div>
+                        <div class="stat-label">Current Reserves (BCM)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="gasReserveChange">Loading...</div>
+                        <div class="stat-label">Reserve Growth (%)</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="naturalGasChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -1299,6 +1410,27 @@
         let demandData = [];
         let productionDemandChart = null;
 
+        // Natural Gas Data Variables
+        let naturalGasProductionData = [];
+        let naturalGasConsumptionData = [];
+        let naturalGasReservesData = [];
+        let naturalGasChart = null;
+
+        // Energy Data Cycling Variables
+        let currentEnergyPage = 0;
+        const energyPages = [
+            {
+                title: "Refined Petroleum",
+                subtitle: "Production, Demand & Exports",
+                pageId: "refinedProductsPage"
+            },
+            {
+                title: "Natural Gas",
+                subtitle: "Production, Consumption & Reserves",
+                pageId: "naturalGasPage"
+            }
+        ];
+
         // Load production data
         async function loadProductionData() {
             try {
@@ -1398,6 +1530,58 @@
             return months[monthName] || 1;
         }
 
+        // Load natural gas production data
+        async function loadNaturalGasProductionData() {
+            try {
+                const data = await d3.csv('data/Annual natural gas production csv.csv');
+                console.log('Natural gas production data loaded:', data.length, 'rows');
+                return data.map(d => ({
+                    year: +d['Year '],
+                    value: +d['Production (MMSCFD)']
+                }))
+                .filter(d => !isNaN(d.value) && d.value > 0)
+                .sort((a, b) => a.year - b.year);
+            } catch (error) {
+                console.error('Error loading natural gas production data:', error);
+                return [];
+            }
+        }
+
+        // Load natural gas consumption data
+        async function loadNaturalGasConsumptionData() {
+            try {
+                const data = await d3.csv('data/Annual Natural Gas Consumption csv.csv');
+                console.log('Natural gas consumption data loaded:', data.length, 'rows');
+                return data.map(d => ({
+                    year: +d['Year '],
+                    value: +d['Consumption (MMSCFD)']
+                }))
+                .filter(d => !isNaN(d.value) && d.value > 0)
+                .sort((a, b) => a.year - b.year);
+            } catch (error) {
+                console.error('Error loading natural gas consumption data:', error);
+                return [];
+            }
+        }
+
+        // Load natural gas reserves data
+        async function loadNaturalGasReservesData() {
+            try {
+                const data = await d3.csv('data/Reserves, Natural Gas csv.csv');
+                console.log('Natural gas reserves data loaded:', data.length, 'rows');
+                return data.filter(d => d.Country === 'Saudi Arabia' && d.Product === 'Natural Gas')
+                          .map(d => ({
+                              year: +d.Year,
+                              value: +d.Value.replace(/,/g, '') // Remove commas from numbers
+                          }))
+                          .filter(d => !isNaN(d.value) && d.value > 0)
+                          .sort((a, b) => a.year - b.year);
+            } catch (error) {
+                console.error('Error loading natural gas reserves data:', error);
+                return [];
+            }
+        }
+
         // Calculate statistics
         function calculateProductionStats(production, demand) {
             const avgProduction = production.reduce((sum, d) => sum + d.value, 0) / production.length;
@@ -1414,6 +1598,21 @@
                 avgSurplus: Math.round(avgSurplus),
                 currentSurplus: Math.round(currentSurplus)
             };
+        }
+
+        // Convert billion cubic meters to million cubic feet
+        function convertBcmToMcf(bcm) {
+            // 1 billion cubic meters = 35,314.67 million cubic feet
+            return bcm * 35314.67;
+        }
+
+        // Convert reserves (static volume) to a theoretical daily equivalent for comparison
+        // This shows "days of reserves at current production rate"
+        function convertReservesToDailyEquivalent(reservesBcm, currentProductionMMSCFD) {
+            const reservesMMCF = convertBcmToMcf(reservesBcm);
+            const reservesDays = reservesMMCF / currentProductionMMSCFD;
+            // Scale down to make it comparable on the chart (divide by 365 to show as years worth)
+            return reservesDays / 365;
         }
 
         // Aggregate monthly data by year (calculate average for each year)
@@ -1628,6 +1827,256 @@
             });
         }
 
+        // Create the natural gas chart
+        function createNaturalGasChart(production, consumption, reserves) {
+            const ctx = document.getElementById('naturalGasChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (naturalGasChart) {
+                naturalGasChart.destroy();
+            }
+
+            const labels = production.map(d => `'${d.year.toString().slice(-2)}`);
+
+            // Convert reserves from BCM to MMSCF and then to a theoretical daily rate
+            // We'll show reserves as "Reserve Equivalent Daily Rate" for comparison
+            const reservesDailyEquivalent = reserves.map((reserve, index) => {
+                const reservesMMCF = convertBcmToMcf(reserve.value);
+                // Convert to daily equivalent by dividing by 365 * years of data coverage (showing as if depleted over 50 years)
+                return reservesMMCF / (365 * 50); // Theoretical daily rate if depleted over 50 years
+            });
+
+            const datasets = [
+                {
+                    label: 'Production',
+                    data: production.map(d => d.value),
+                    borderColor: '#2E7D32',
+                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: '#2E7D32',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 0.5,
+                    pointRadius: 1,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Consumption',
+                    data: consumption.map(d => d.value),
+                    borderColor: '#D32F2F',
+                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: '#D32F2F',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 0.5,
+                    pointRadius: 1,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Reserve Capacity (50yr)',
+                    data: reservesDailyEquivalent,
+                    borderColor: '#1976D2',
+                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: '#1976D2',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 0.5,
+                    pointRadius: 1,
+                    pointHoverRadius: 4
+                }
+            ];
+
+            naturalGasChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: false,
+                                boxWidth: 20,
+                                boxHeight: 1,
+                                padding: 12,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#1976D2',
+                            borderWidth: 1,
+                            cornerRadius: 6,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    const unit = context.dataset.label.includes('Reserve') ? ' MMSCFD' : ' MMSCFD';
+                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}${unit}`;
+                                },
+                                afterBody: function(context) {
+                                    const productionContext = context.find(c => c.dataset.label === 'Production');
+                                    const consumptionContext = context.find(c => c.dataset.label === 'Consumption');
+                                    const reserveContext = context.find(c => c.dataset.label.includes('Reserve'));
+                                    
+                                    const result = [];
+                                    
+                                    if (productionContext && consumptionContext) {
+                                        const production = productionContext.parsed.y;
+                                        const consumption = consumptionContext.parsed.y;
+                                        const surplus = production - consumption;
+                                        
+                                        result.push(``, `${surplus >= 0 ? '📈 Surplus' : '📉 Deficit'}: ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} MMSCFD`);
+                                    }
+                                    
+                                    if (reserveContext) {
+                                        result.push(`💎 Note: Reserve shown as 50-year depletion rate`);
+                                    }
+                                    
+                                    return result;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Year',
+                                font: {
+                                    size: 11
+                                },
+                                color: '#1976D2'
+                            },
+                            ticks: {
+                                maxTicksLimit: 15,
+                                maxRotation: 0,
+                                color: '#666666',
+                                font: {
+                                    size: 9
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Volume (MMSCFD)',
+                                font: {
+                                    size: 11
+                                },
+                                color: '#1976D2'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                },
+                                color: '#666666',
+                                font: {
+                                    size: 9
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Energy Data Cycling Functions
+        function switchEnergyPage(pageIndex) {
+            currentEnergyPage = pageIndex;
+            
+            // Update title and subtitle
+            const titleElement = document.getElementById('energyDataTitle');
+            const subtitleElement = document.getElementById('energyDataSubtitle');
+            titleElement.textContent = energyPages[pageIndex].title;
+            subtitleElement.textContent = energyPages[pageIndex].subtitle;
+            
+            // Hide all pages
+            document.querySelectorAll('.energy-page').forEach(page => {
+                page.style.display = 'none';
+            });
+            
+            // Show current page
+            document.getElementById(energyPages[pageIndex].pageId).style.display = 'flex';
+            
+            // Update indicators
+            document.querySelectorAll('.indicator-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === pageIndex);
+            });
+            
+            // Initialize the appropriate data if switching to natural gas
+            if (pageIndex === 1 && naturalGasProductionData.length === 0) {
+                initializeNaturalGas();
+            }
+        }
+
+        // Initialize natural gas dashboard
+        async function initializeNaturalGas() {
+            try {
+                // Load all natural gas datasets
+                const [production, consumption, reserves] = await Promise.all([
+                    loadNaturalGasProductionData(),
+                    loadNaturalGasConsumptionData(),
+                    loadNaturalGasReservesData()
+                ]);
+
+                naturalGasProductionData = production;
+                naturalGasConsumptionData = consumption;
+                naturalGasReservesData = reserves;
+
+                if (production.length === 0 || consumption.length === 0 || reserves.length === 0) {
+                    console.error('Failed to load natural gas data');
+                    return;
+                }
+
+                // Calculate and display statistics
+                const avgProduction = production.reduce((sum, d) => sum + d.value, 0) / production.length;
+                const avgConsumption = consumption.reduce((sum, d) => sum + d.value, 0) / consumption.length;
+                const currentReserves = reserves[reserves.length - 1]?.value || 0;
+                const firstReserves = reserves[0]?.value || 0;
+                const reserveGrowth = firstReserves > 0 ? ((currentReserves - firstReserves) / firstReserves * 100) : 0;
+
+                // Update statistics display
+                document.getElementById('avgGasProduction').textContent = avgProduction.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                document.getElementById('avgGasConsumption').textContent = avgConsumption.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                document.getElementById('currentGasReserves').textContent = currentReserves.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                
+                const reserveChangeElement = document.getElementById('gasReserveChange');
+                reserveChangeElement.textContent = (reserveGrowth >= 0 ? '+' : '') + reserveGrowth.toFixed(1) + '%';
+                reserveChangeElement.style.color = reserveGrowth >= 0 ? '#00be9d' : '#f44336';
+
+                // Create the natural gas chart
+                createNaturalGasChart(production, consumption, reserves);
+
+            } catch (error) {
+                console.error('Error initializing natural gas dashboard:', error);
+            }
+        }
+
         // Initialize production vs demand dashboard
         async function initializeProductionDemand() {
             try {
@@ -1660,6 +2109,24 @@
 
         // Initialize production vs demand when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners for energy data cycling
+            document.getElementById('nextEnergyBtn').addEventListener('click', function() {
+                const nextPage = (currentEnergyPage + 1) % energyPages.length;
+                switchEnergyPage(nextPage);
+            });
+
+            document.getElementById('prevEnergyBtn').addEventListener('click', function() {
+                const prevPage = currentEnergyPage === 0 ? energyPages.length - 1 : currentEnergyPage - 1;
+                switchEnergyPage(prevPage);
+            });
+
+            // Add click listeners to indicator dots
+            document.querySelectorAll('.indicator-dot').forEach((dot, index) => {
+                dot.addEventListener('click', function() {
+                    switchEnergyPage(index);
+                });
+            });
+
             // Add a delay to ensure map loads first
             setTimeout(initializeProductionDemand, 1000);
         });
