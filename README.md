@@ -1,9 +1,10 @@
-# Saudi Arabia Refinery & Energy Dashboard
+# Saudi Arabia Refinery & Energy
 
 This [project](https://xuanx1.github.io/fuelLoad/saudi.html) provides interactive dashboards and visualizations for analyzing Saudi Arabia's refinery infrastructure, refined product production, demand patterns, natural gas data, and energy reserves. The visualizations are built using web technologies and present comprehensive energy sector data through interactive charts and maps with cycling page functionality.
 
 ## 🗺️ Interactive Dashboards [Preview](https://xuanx1.github.io/fuelLoad/saudi.html)
 ![Screenshot 2025-08-23 191945](https://github.com/user-attachments/assets/8015f2df-a73f-46b9-836f-1dcf309fc4fb)
+![Screenshot 2025-08-23 195339](https://github.com/user-attachments/assets/428fc1ab-6fbb-4b9d-8d5f-b63391419db3)
 
 ### Main Visualization Files
 
