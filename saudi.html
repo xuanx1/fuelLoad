@@ -2438,6 +2438,69 @@
             // Add a delay to ensure map loads first
             setTimeout(initializeProductionDemand, 1000);
         });
+
+
+//Refinery capacities api
+fetch('https://open.data.gov.sa/data/api/datasets?version=-1&dataset=e9384da6-a193-4f5c-a663-c276bd6e82c7', {
+    method: 'GET',
+    headers: new Headers(
+        { "Accept": "application/json" }
+    )
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+
+//Reserves of Natural Gas api
+fetch('https://open.data.gov.sa/data/api/datasets?version=-1&dataset=ea7375e3-6d89-402a-919b-56d3a7f76c9f', {
+    method: 'GET',
+    headers: new Headers(
+        { "Accept": "application/json" }
+    )
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+
+// Exports of Refined Products api
+fetch('https://open.data.gov.sa/data/api/datasets?version=-1&dataset=f7aac2f3-c87c-494c-b2b6-93e436579c61', {
+    method: 'GET',
+    headers: new Headers(
+        { "Accept": "application/json" }
+    )
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+
+//Production of refined products api
+fetch('https://open.data.gov.sa/data/api/datasets?version=-1&dataset=9b4b6d96-63e8-4fa4-9587-25f32c753a06', {
+    method: 'GET',
+    headers: new Headers(
+        { "Accept": "application/json" }
+    )
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+
+//refined products demand api
+fetch('https://open.data.gov.sa/data/api/datasets?version=-1&dataset=2ad86fc5-e00a-4788-9dc5-4b5ff4d73313', {
+    method: 'GET',
+    headers: new Headers(
+        { "Accept": "application/json" }
+    )
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+
+
     </script>
 </body>
 </html>
