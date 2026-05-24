@@ -1,9 +1,6 @@
-# Saudi Energy Grid // Sector.SA
+# Saudi Energy Grid // [Sector.SA](https://xuanx1.github.io/fuelLoad/saudi.html)
 
 Dystopian-futurism HUD for Saudi Arabia's downstream energy sector — refineries, refined-product flows, natural gas.
-
-[Live preview →](https://xuanx1.github.io/fuelLoad/saudi.html)
-
 <img width="1920" height="918" alt="saudi" src="https://github.com/user-attachments/assets/884afec8-f2d8-466b-9d62-6ede827f3e8d" />
 
 ## Aesthetic
