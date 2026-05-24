@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saudi Arabia's Energy, Mapped</title>
+    <title>SAUDI ENERGY GRID // SECTOR.SA</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,25 +15,166 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --bg: #060709;
+            --bg-deep: #0a0d12;
+            --panel: rgba(10, 13, 18, 0.88);
+            --panel-solid: #0a0d12;
+            --line: rgba(255, 138, 30, 0.22);
+            --line-bright: #ff8a1e;
+            --accent: #ff8a1e;
+            --accent-hot: #ffb347;
+            --accent-dim: rgba(255, 138, 30, 0.55);
+            --cyan: #ffb347;
+            --sand: #e8ddc7;
+            --positive: #c8ff3a;
+            --negative: #ff5c00;
+            --text: #e8ddc7;
+            --text-dim: rgba(232, 221, 199, 0.55);
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             overflow: hidden;
+            letter-spacing: 0.02em;
+        }
+
+        /* HUD grid overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 138, 30, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 138, 30, 0.04) 1px, transparent 1px);
+            background-size: 56px 56px;
+            pointer-events: none;
+            z-index: 400;
+            mix-blend-mode: screen;
+        }
+
+        /* Scanlines */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg, transparent 0, transparent 2px,
+                rgba(255, 138, 30, 0.018) 3px
+            );
+            pointer-events: none;
+            z-index: 401;
         }
 
         #map {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            top: 50px;
+            left: 80px;
+            width: calc(100vw - 80px);
+            height: calc(100vh - 50px);
             z-index: 1;
+            background: #060709;
+        }
+
+        /* Filter the tile layer only — applying filter to #map rasterises
+           SVG overlays and blurs the geojson on zoom */
+        .leaflet-tile-pane {
+            filter: hue-rotate(-18deg) sepia(0.35) saturate(0.75) brightness(0.72) contrast(1.12);
+        }
+
+        /* Render SVG geometry with maximum precision (no AA shortcuts) */
+        .leaflet-overlay-pane svg,
+        .leaflet-overlay-pane svg path {
+            shape-rendering: geometricPrecision;
+        }
+
+
+        /* Vignette over map */
+        .map-vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 399;
+            background: radial-gradient(ellipse at center, transparent 30%, rgba(6, 7, 9, 0.85) 100%);
+        }
+
+        /* HUD corner brackets */
+        .hud-corner {
+            position: fixed;
+            width: 28px;
+            height: 28px;
+            z-index: 1100;
+            pointer-events: none;
+        }
+        .hud-corner.tl { top: 12px; left: 12px; border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+        .hud-corner.tr { top: 12px; right: 12px; border-top: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+        .hud-corner.bl { bottom: 12px; left: 12px; border-bottom: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+        .hud-corner.br { bottom: 12px; right: 12px; border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+
+        /* HUD top status bar */
+        .hud-topbar {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1102;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-top: none;
+            padding: 7px 22px;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 10.5px;
+            color: var(--text-dim);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            display: flex;
+            gap: 22px;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            white-space: nowrap;
+        }
+        .hud-topbar .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent);
+            animation: hudPulse 1.8s ease-in-out infinite;
+        }
+        .hud-topbar .sep { color: var(--accent-dim); }
+        .hud-topbar .val { color: var(--accent); }
+
+        @keyframes hudPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.7); }
+        }
+
+        /* Coordinates strip at bottom-center */
+        .hud-coords {
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 9.5px;
+            color: var(--text-dim);
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            pointer-events: none;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            padding: 4px 14px;
+            backdrop-filter: blur(8px);
         }
 
         .controls {
             margin-bottom: 20px;
             padding: 15px;
-            background: #f8f9fa;
-            border-radius: 6px;
+            background: var(--panel);
+            border: 1px solid var(--line);
         }
 
         .control-group {
@@ -46,140 +187,169 @@
 
         .control-group label {
             display: block;
-            font-weight: bold;
-            color: #333;
-            font-size: 12px;
-            margin-bottom: 5px;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-weight: 400;
+            color: var(--accent);
+            font-size: 10px;
+            margin-bottom: 6px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
         }
 
         select, input {
             width: 100%;
             padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--line);
+            color: var(--text);
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 12px;
         }
 
         .legend {
-            background: #f8f9fa;
+            background: var(--panel);
             padding: 15px;
-            border-radius: 6px;
+            border: 1px solid var(--line);
             margin-bottom: 20px;
         }
 
         .legend h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 16px;
+            margin: 0 0 12px 0;
+            color: var(--accent);
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 13px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            font-weight: 600;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
             margin-bottom: 8px;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 11px;
         }
 
         .legend-color {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             margin-right: 10px;
-            border-radius: 3px;
+            border: 1px solid var(--line);
             flex-shrink: 0;
         }
 
         .stats {
-            background: #f8f9fa;
+            background: var(--panel);
             padding: 15px;
-            border-radius: 6px;
+            border: 1px solid var(--line);
             margin-bottom: 20px;
         }
 
         .stats h3 {
-            margin: 0 0 15px 0;
-            color: #333;
-            font-size: 16px;
+            margin: 0 0 12px 0;
+            color: var(--accent);
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 13px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            font-weight: 600;
         }
 
         .stat-item {
             display: flex;
             justify-content: space-between;
             margin-bottom: 8px;
-            padding: 5px 0;
-            border-bottom: 1px solid #ddd;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--line);
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
         }
 
         .stat-label {
-            font-weight: bold;
+            font-weight: 400;
+            color: var(--text);
         }
 
-        .risk-high { color: #d32f2f; }
-        .risk-medium { color: #f57c00; }
-        .risk-low { color: #388e3c; }
+        .risk-high { color: var(--negative); }
+        .risk-medium { color: var(--accent-hot); }
+        .risk-low { color: var(--positive); }
 
         .status-info {
-            background: #e3f2fd;
-            color: #1976d2;
+            background: var(--panel);
+            color: var(--accent);
             padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 12px;
+            border: 1px solid var(--line);
+            margin-bottom: 18px;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 11px;
             text-align: center;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
         }
 
         #refreshBtn {
             width: 100%;
-            background: #007cba;
-            color: white;
+            background: var(--accent);
+            color: var(--bg);
             border: none;
             padding: 12px;
-            border-radius: 4px;
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
             cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
+            transition: all 0.25s ease;
         }
 
         #refreshBtn:hover:not(:disabled) {
-            background-color: #005a87;
+            background: var(--accent-hot);
+            box-shadow: 0 0 22px var(--accent-dim);
         }
 
         #refreshBtn:disabled {
-            background-color: #ccc;
+            background: #1a1d22;
+            color: var(--text-dim);
             cursor: not-allowed;
         }
 
         .loading, .error {
             position: fixed;
-            top: 20px;
+            top: 48px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 20px;
-            border-radius: 6px;
+            padding: 10px 18px;
             z-index: 999;
-            font-weight: bold;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            border: 1px solid var(--line);
+            backdrop-filter: blur(6px);
         }
 
         .loading {
-            background: #e3f2fd;
-            color: #1976d2;
+            background: var(--panel);
+            color: var(--cyan);
         }
 
         .error {
-            background: #ffebee;
-            color: #c62828;
+            background: var(--panel);
+            color: var(--negative);
+            border-color: var(--negative);
         }
 
-        /* Progress bar - marker loading */
+        /* Progress bar */
         .progress-container {
             position: fixed;
-            top: 20px;
-            left: 170px;
+            top: 56px;
+            left: 50%;
             transform: translateX(-50%);
-            background: white;
-            opacity: 0.65;
-            backdrop-filter: blur(5px);
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: var(--panel);
+            backdrop-filter: blur(8px);
+            padding: 14px 18px;
+            border: 1px solid var(--line);
             z-index: 999;
             min-width: 300px;
             display: none;
@@ -188,199 +358,271 @@
         .progress-text {
             text-align: center;
             margin-bottom: 10px;
-            font-weight: bold;
-            color: #333;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 10.5px;
+            color: var(--accent);
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
         }
 
         .progress-bar-container {
-            background: #e0e0e0;
-            border-radius: 10px;
-            height: 8px;
+            background: rgba(255, 138, 30, 0.08);
+            height: 4px;
             overflow: hidden;
+            border: 1px solid var(--line);
         }
 
         .progress-bar {
-            background: linear-gradient(90deg, #007cba, #005a87);
+            background: linear-gradient(90deg, var(--accent), var(--accent-hot));
             height: 100%;
             width: 0%;
             transition: width 0.3s ease;
-            border-radius: 10px;
+            box-shadow: 0 0 12px var(--accent);
         }
 
         .progress-stats {
             margin-top: 8px;
-            font-size: 12px;
-            color: #666;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
             text-align: center;
+            letter-spacing: 0.18em;
         }
 
         .leaflet-interactive {
             transition: opacity 0.3s ease-in-out, fill-opacity 0.3s ease-in-out !important;
         }
 
-        /* Refinery Map Styles */
+        /* Refinery section panels */
         .refinery-section {
             margin-bottom: 20px;
-            background: #f0f8ff;
-            border-radius: 6px;
+            background: var(--panel);
             overflow: hidden;
+            border: 1px solid var(--line);
         }
-        
+
         .refinery-header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            padding: 20px 20px 15px 20px;
+            text-align: left;
+            margin-bottom: 0;
+            border-bottom: 1px solid var(--line);
+            padding: 18px 20px 14px 20px;
             flex-shrink: 0;
+            position: relative;
         }
 
         .refinery-header span {
-            font-size: 1.3em;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            text-shadow: 0 0 12px rgba(255, 138, 30, 0.45);
         }
-        
+
+        .refinery-header::before {
+            content: '◢ ';
+            color: var(--accent);
+            margin-right: 4px;
+            font-size: 10px;
+            vertical-align: 2px;
+        }
+
+        .refinery-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 18px;
+            width: 56px;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
         .refinery-content {
             flex: 1;
-            overflow-y: auto;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             min-height: 0;
         }
 
-        /* Minimalist scrollbar for refinery content */
-        .refinery-content::-webkit-scrollbar {
-            width: 6px;
-        }
+        .refinery-content.expanded { max-height: 400px; }
 
-        .refinery-content::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 3px;
-        }
-
-        .refinery-content::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 3px;
-        }
-
-        .refinery-content::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.5);
-        }
-        
-        .refinery-content.expanded {
-            max-height: 400px;
-        }
-        
         .refinery-list {
-            padding: 15px;
+            padding: 4px 8px 16px 16px;
             flex: 1;
-            overflow-y: auto;
+            overflow-y: scroll;
             min-height: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) rgba(255, 138, 30, 0.08);
         }
 
-        /* Minimalist scrollbar for refinery list */
-        .refinery-list::-webkit-scrollbar {
-            width: 6px;
-        }
-
+        .refinery-list::-webkit-scrollbar { width: 10px; }
         .refinery-list::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 3px;
+            background: rgba(255, 138, 30, 0.06);
+            border-left: 1px solid var(--line);
         }
-
         .refinery-list::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 3px;
+            background: var(--accent);
+            border: 2px solid var(--panel-solid);
+            box-shadow: 0 0 6px rgba(255, 138, 30, 0.6);
         }
+        .refinery-list::-webkit-scrollbar-thumb:hover { background: var(--accent-hot); }
 
-        .refinery-list::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.5);
-        }
-        
         .refinery-item {
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 10px;
+            background: rgba(255, 138, 30, 0.04);
+            border: 1px solid var(--line);
+            border-left: 2px solid var(--accent);
+            padding: 12px 14px;
+            margin-bottom: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
-            backdrop-filter: blur(3px);
+            position: relative;
         }
-        
+
         .refinery-item:hover {
-            background: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.4);
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background: rgba(255, 138, 30, 0.1);
+            border-left-color: var(--accent-hot);
+            box-shadow: 0 0 18px rgba(255, 138, 30, 0.22);
+            transform: translateX(2px);
         }
-        
+
+        .refinery-item::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 5px;
+            height: 5px;
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent);
+        }
+
         .refinery-name {
-            font-weight: bold;
-            color: white;
-            font-size: 0.9em;
-            margin-bottom: 3px;
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-weight: 600;
+            color: var(--sand);
+            font-size: 11.5px;
+            letter-spacing: 0.13em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
         }
-        
+
         .refinery-company {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.8em;
-            margin-bottom: 5px;
+            color: var(--text-dim);
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 10px;
+            margin-bottom: 6px;
+            letter-spacing: 0.1em;
         }
-        
+
         .refinery-capacity {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent-dim);
             padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.7em;
-            font-weight: bold;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 10px;
+            font-weight: 700;
             display: inline-block;
+            letter-spacing: 0.12em;
         }
-        
+
         .refinery-location {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.7em;
-            margin-top: 3px;
+            color: var(--text-dim);
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 9.5px;
+            margin-top: 6px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
         }
-        
+
         .refinery-toggle {
             font-size: 1.2em;
             transition: transform 0.3s ease;
+            color: var(--accent);
         }
-        
-        .refinery-toggle.expanded {
-            transform: rotate(180deg);
-        }
-        
+
+        .refinery-toggle.expanded { transform: rotate(180deg); }
+
         .total-capacity {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 6px;
-            padding: 12px;
-            text-align: center;
-            backdrop-filter: blur(3px);
-            margin: 0 20px 20px 20px;
+            background: rgba(255, 138, 30, 0.06);
+            border: 1px solid var(--line);
+            border-top: 2px solid var(--accent);
+            padding: 12px 14px 12px;
+            text-align: left;
+            margin: 14px 16px 14px 16px;
             flex-shrink: 0;
+            position: relative;
         }
-        
-        .capacity-number {
-            font-size: 1.2em;
-            font-weight: bold;
+
+        .total-capacity::before {
+            content: '// TOTAL OUTPUT';
             display: block;
-            margin-bottom: 3px;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 9px;
+            color: var(--accent);
+            letter-spacing: 0.28em;
+            margin-bottom: 8px;
+        }
+
+        .capacity-number {
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 1.55em;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 2px;
+            letter-spacing: 0.04em;
+            text-shadow: 0 0 16px rgba(255, 138, 30, 0.6);
+            line-height: 1.1;
+        }
+
+        .total-capacity > span:not(.capacity-number) {
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 9.5px;
+            color: var(--text-dim);
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
         }
 
         .refinery-marker {
             background: none !important;
             border: none !important;
             box-shadow: none !important;
+            cursor: pointer;
+        }
+
+        /* Highlight the tower on hover and while its popup is open.
+           Switches the amber gradient + stroke to a brighter lime green
+           with an intensified glow. */
+        .refinery-marker:hover polygon,
+        .refinery-marker.is-active polygon {
+            fill: #c8ff3a !important;
+            stroke: #c8ff3a !important;
+            filter: drop-shadow(0 0 8px rgba(200, 255, 58, 0.95)) !important;
+        }
+        .refinery-marker:hover line,
+        .refinery-marker.is-active line {
+            stroke: #c8ff3a !important;
+        }
+        .refinery-marker:hover circle,
+        .refinery-marker.is-active circle {
+            fill: #c8ff3a !important;
+            filter: drop-shadow(0 0 6px #c8ff3a) !important;
+        }
+        .refinery-marker:hover .refinery-emoji,
+        .refinery-marker.is-active .refinery-emoji {
+            color: #c8ff3a !important;
+            text-shadow: 0 0 8px #c8ff3a, 0 0 16px rgba(200, 255, 58, 0.7) !important;
         }
 
         .refinery-with-arrow {
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-family: Arial, sans-serif;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
         }
 
         .capacity-arrow {
@@ -392,96 +634,85 @@
             width: 0;
             height: 0;
             border-style: solid;
-            border-left: 8px solid #1976D2;
-            border-right: 8px solid #1976D2;
-            background: rgba(25, 118, 210, 0.089);
+            border-left: 8px solid var(--accent);
+            border-right: 8px solid var(--accent);
             position: relative;
         }
 
-        .capacity-arrow-shape::before {
-            content: '';
-            position: absolute;
-            left: -8px;
-            bottom: 0;
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            background: rgba(25, 118, 210, 0.123);
-        }
-
         .refinery-emoji {
-            font-size: 15px;
+            font-size: 12px;
+            color: var(--accent);
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            text-shadow: 0 0 6px var(--accent), 0 0 12px rgba(255, 138, 30, 0.4);
             margin-bottom: 2px;
+            letter-spacing: 0;
         }
 
-        /* Standalone Refinery Section - positioned on map */
+        /* Standalone Refinery Section */
         .standalone-refinery-section {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            bottom: 20px;
+            top: 56px;
+            right: 24px;
+            bottom: 56px;
             width: 320px;
-            height: calc(100vh - 40px);
-            background: rgba(30, 64, 175, 0.95);
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.2);
+            height: calc(100vh - 112px);
+            background: var(--panel);
+            color: var(--text);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--line);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 12px 40px rgba(0,0,0,0.6);
             z-index: 1000;
-            overflow-y: auto;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
-        /* Minimalist scrollbar for refineries section */
-        .standalone-refinery-section::-webkit-scrollbar {
-            width: 6px;
+        .standalone-refinery-section::before,
+        .standalone-refinery-section::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 1px solid var(--accent);
+            z-index: 1;
         }
+        .standalone-refinery-section::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .standalone-refinery-section::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
 
-        .standalone-refinery-section::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
-            border-radius: 3px;
-        }
+        .standalone-refinery-section::-webkit-scrollbar { width: 6px; }
+        .standalone-refinery-section::-webkit-scrollbar-track { background: rgba(255, 138, 30, 0.05); }
+        .standalone-refinery-section::-webkit-scrollbar-thumb { background: var(--accent-dim); }
+        .standalone-refinery-section::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-        .standalone-refinery-section::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 3px;
-        }
-
-        .standalone-refinery-section::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.5);
-        }
-
-        /* Hover tooltip styles */
+        /* Hover tooltip */
         .refinery-tooltip {
             position: absolute;
-            background: rgba(30, 64, 175, 0.95);
-            color: white;
+            background: var(--panel);
+            color: var(--text);
             padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: bold;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 10.5px;
+            font-weight: 400;
             pointer-events: none;
             z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.2);
-            max-width: 200px;
+            box-shadow: 0 0 18px rgba(255, 138, 30, 0.3);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--accent);
+            max-width: 220px;
             opacity: 0;
             transition: opacity 0.2s ease;
+            letter-spacing: 0.08em;
         }
 
         .refinery-tooltip.visible {
             opacity: 1;
         }
 
-        /* Custom popup styling to match tooltip design */
+        /* Custom leaflet popup */
         .leaflet-popup-content-wrapper {
             background: transparent !important;
-            border-radius: 8px !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+            border-radius: 0 !important;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8) !important;
             padding: 0 !important;
         }
 
@@ -491,127 +722,177 @@
         }
 
         .leaflet-popup-tip {
-            background: rgba(30, 61, 156, 0.95) !important;
-            border: 1px solid rgba(255,255,255,0.2) !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+            background: var(--panel-solid) !important;
+            border: 1px solid var(--accent) !important;
+            box-shadow: 0 0 12px rgba(255, 138, 30, 0.4) !important;
+        }
+
+        .leaflet-popup-close-button {
+            color: var(--accent) !important;
+            font-size: 22px !important;
+            font-weight: 400 !important;
+            top: 8px !important;
+            right: 10px !important;
+        }
+
+        .leaflet-control-attribution {
+            background: var(--panel) !important;
+            color: var(--text-dim) !important;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace !important;
+            font-size: 9px !important;
+            letter-spacing: 0.1em !important;
+            border: 1px solid var(--line) !important;
+            padding: 2px 8px !important;
+        }
+        .leaflet-control-attribution a {
+            color: var(--accent) !important;
         }
 
         .city-title {
             position: fixed;
-            bottom: 30px;
-            left: 35px;
-            color: rgba(30, 64, 175, 0.95);
-            font-size: 56px;
-            font-weight: bold;
-            font-family: 'Gotham Bold', 'Gotham', 'Helvetica Neue', Arial, sans-serif;
+            bottom: 48px;
+            left: 36px;
+            color: var(--accent);
+            font-size: 52px;
+            font-weight: 700;
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
             z-index: 998;
             pointer-events: auto;
             cursor: default;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.18em;
             text-transform: uppercase;
+            line-height: 1;
+            text-shadow: 0 0 28px rgba(255, 138, 30, 0.55), 0 0 4px rgba(255, 138, 30, 0.8);
         }
 
+        /* Country label centered on geojson */
+        .country-label {
+            background: none !important;
+            border: none !important;
+            pointer-events: none;
+        }
+        .country-label-inner {
+            color: var(--accent);
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            text-shadow: 0 0 20px rgba(255, 138, 30, 0.6), 0 0 4px rgba(255, 138, 30, 0.85);
+            opacity: 0.7;
+        }
+
+        .city-title::before {
+            content: '//';
+            color: var(--accent-dim);
+            margin-right: 16px;
+            font-size: 40px;
+            vertical-align: 6px;
+        }
 
         .city-subtitle {
             position: fixed;
-            bottom: 100px;
-            left: 25px;
-            padding: 0px 15px;
+            bottom: 116px;
+            left: 38px;
+            padding: 0;
             z-index: 999;
-            font-size: 12px;
-            font-family: 'Gotham', 'Helvetica Neue', Arial, sans-serif;
-            font-weight: bold;
-            opacity: 0.7;
-            color: #383838;
-            letter-spacing: 0.2em;
+            font-size: 10.5px;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-weight: 400;
+            opacity: 0.9;
+            color: var(--text-dim);
+            letter-spacing: 0.4em;
             text-transform: uppercase;
-            transition: letter-spacing 0.3s ease;
         }
 
-        .leaflet-popup-content-wrapper {
-            background: transparent !important;
-            border-radius: 8px !important;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
-            padding: 0 !important;
-            margin: 0 !important;
+        .city-subtitle::before {
+            content: '◢ ';
+            color: var(--accent);
+            margin-right: 4px;
         }
 
-        .leaflet-popup-content {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: transparent !important;
-            border-radius: 8px !important;
-            overflow: hidden !important;
-        }
-
-        .leaflet-popup-tip {
-            background: rgba(30, 61, 156, 0.95) !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
-        }
-
-        .leaflet-popup-close-button {
-            color: white !important;
-            font-weight: normal !important;
-            font-size: 18px !important;
+        .city-subtitle::after {
+            content: '▸ ARABIAN PLATE';
+            color: var(--accent-dim);
+            margin-left: 10px;
         }
 
         /* City selector */
         .city-selector {
             position: fixed;
-            bottom: 40px;
-            right: 20px;
+            bottom: 32px;
+            right: 360px;
             z-index: 999;
-            background: rgba(66, 66, 66, 0.12);
-            border-radius: 25px;
-            padding: 5px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            padding: 4px;
             display: flex;
-            gap: 5px;
+            gap: 0;
+            backdrop-filter: blur(8px);
         }
 
         .city-option {
             padding: 8px 16px;
-            border-radius: 20px;
             background: transparent;
             border: none;
-            color: #424242;
-            font-size: 12px;
-            font-weight: bold;
+            color: var(--text-dim);
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 10.5px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
-            opacity: 0.5;
+            transition: all 0.25s ease;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
         }
 
         .city-option.active {
-            background: rgba(66, 66, 66, 0.8);
-            color: white;
-            opacity: 1;
+            background: var(--accent);
+            color: var(--bg);
         }
 
-        .city-option:hover {
-            opacity: 0.8;
+        .city-option:hover:not(.active) {
+            color: var(--accent);
         }
 
-        /* Production vs Demand Section - positioned below refineries */
+        /* Production vs Demand Section */
         .production-demand-section {
             position: fixed;
-            top: 20px;
-            left: 20px;
-            bottom: 140px;
+            top: 56px;
+            left: 24px;
+            bottom: 200px;
             width: 380px;
-            background: rgba(30, 64, 175, 0.95);
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--panel);
+            color: var(--text);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--line);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 12px 40px rgba(0,0,0,0.6);
             z-index: 1000;
-            overflow-y: auto;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
+        .production-demand-section::before,
+        .production-demand-section::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 1px solid var(--accent);
+            z-index: 1;
+        }
+        .production-demand-section::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .production-demand-section::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+        .production-demand-section::-webkit-scrollbar { width: 6px; }
+        .production-demand-section::-webkit-scrollbar-track { background: rgba(255, 138, 30, 0.05); }
+        .production-demand-section::-webkit-scrollbar-thumb { background: var(--accent-dim); }
+
         .production-demand-container {
-            padding: 20px;
+            padding: 18px;
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -619,57 +900,98 @@
 
         .production-demand-header {
             text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            padding-bottom: 15px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 14px;
+            position: relative;
+        }
+
+        .production-demand-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 56px;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
         }
 
         .production-demand-title {
-            font-size: 1.3em;
-            font-weight: bold;
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
             margin-bottom: 5px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            text-shadow: 0 0 14px rgba(255, 138, 30, 0.5);
         }
 
         .production-demand-subtitle {
-            font-size: 0.85em;
-            opacity: 0.9;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 9.5px;
+            color: var(--text-dim);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
         }
 
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 14px;
         }
 
         .stat-card {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 6px;
-            padding: 12px;
-            text-align: center;
-            backdrop-filter: blur(3px);
+            background: rgba(255, 138, 30, 0.05);
+            border: 1px solid var(--line);
+            border-left: 2px solid var(--accent);
+            padding: 12px 10px;
+            text-align: left;
+            position: relative;
         }
 
-        .stat-value {
-            font-size: 1.2em;
-            font-weight: bold;
-            margin-bottom: 3px;
+        .stat-card .stat-value {
+            font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 4px;
+            letter-spacing: 0.04em;
+            text-shadow: 0 0 10px rgba(255, 138, 30, 0.4);
         }
 
-        .stat-label {
-            font-size: 0.7em;
-            opacity: 0.8;
-            line-height: 1.2;
+        .stat-card .stat-label {
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+            font-size: 8.5px;
+            color: var(--text-dim);
+            opacity: 1;
+            line-height: 1.4;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
         }
 
         .chart-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 8px;
-            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--line);
+            padding: 12px;
             flex: 1;
             min-height: 250px;
+            position: relative;
         }
+
+        .chart-container::before,
+        .chart-container::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border: 1px solid var(--accent);
+        }
+        .chart-container::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .chart-container::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
 
         #productionDemandChart, #naturalGasChart {
             height: 100% !important;
@@ -687,29 +1009,29 @@
         .title-section {
             flex: 1;
             text-align: center;
+            padding: 0 8px;
         }
 
         .nav-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            width: 30px;
+            height: 30px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
+            font-size: 11px;
+            transition: all 0.25s ease;
             flex-shrink: 0;
+            font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace;
         }
 
         .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.5);
-            transform: scale(1.1);
+            background: var(--accent);
+            color: var(--bg);
+            box-shadow: 0 0 16px var(--accent-dim);
         }
 
         .nav-btn:active {
@@ -718,24 +1040,28 @@
 
         .energy-indicator {
             display: flex;
-            gap: 6px;
+            gap: 8px;
             align-items: center;
             justify-content: center;
-            margin-top: 5px;
+            margin-top: 8px;
         }
 
         .indicator-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
+            width: 16px;
+            height: 2px;
+            border-radius: 0;
+            background: var(--text-dim);
             cursor: pointer;
             transition: all 0.3s ease;
+            opacity: 0.4;
         }
 
         .indicator-dot.active {
-            background: rgba(255, 255, 255, 0.9);
-            transform: scale(1.5);
+            background: var(--accent);
+            opacity: 1;
+            width: 28px;
+            box-shadow: 0 0 8px var(--accent);
+            transform: none;
         }
 
         .energy-page {
@@ -743,14 +1069,182 @@
             flex-direction: column;
             height: 100%;
         }
+
+        /* ===================================
+           MOBILE / TABLET RESPONSIVE LAYOUT
+           =================================== */
+
+        .mobile-tabs { display: none; }
+
+        /* Tablet landscape and narrower desktop — compress widths */
+        @media (max-width: 1200px) {
+            .production-demand-section { width: 320px; }
+            .standalone-refinery-section { width: 280px; }
+            .city-title { font-size: 44px; }
+            .city-subtitle { bottom: 108px; }
+            .city-selector { bottom: 32px; right: 320px; }
+        }
+
+        /* Tablet portrait & phones — switch to bottom-drawer model */
+        @media (max-width: 900px) {
+            .mobile-tabs {
+                display: flex;
+                position: fixed;
+                bottom: 24px;
+                left: 12px;
+                right: 12px;
+                z-index: 1005;
+                gap: 6px;
+                background: var(--panel);
+                border: 1px solid var(--line);
+                padding: 4px;
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            }
+            .mob-tab {
+                flex: 1;
+                padding: 11px 8px;
+                background: transparent;
+                border: none;
+                color: var(--text-dim);
+                font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.22em;
+                text-transform: uppercase;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            .mob-tab.active {
+                background: var(--accent);
+                color: var(--bg);
+                box-shadow: 0 0 16px var(--accent-dim);
+            }
+            .mob-tab:active { transform: scale(0.98); }
+
+            /* Hide panels by default; open via .mobile-open */
+            .production-demand-section,
+            .standalone-refinery-section {
+                display: none;
+                top: 52px;
+                bottom: 76px;
+                left: 12px;
+                right: 12px;
+                width: auto;
+                height: auto;
+                animation: drawerUp 0.25s ease-out;
+            }
+            .production-demand-section.mobile-open,
+            .standalone-refinery-section.mobile-open {
+                display: flex;
+            }
+
+            @keyframes drawerUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+
+            /* HUD compression */
+            .hud-topbar {
+                font-size: 9px;
+                padding: 5px 12px;
+                gap: 10px;
+                max-width: calc(100% - 32px);
+                overflow: hidden;
+            }
+            .hud-topbar .val { font-size: 9.5px; }
+            .hud-corner { width: 18px; height: 18px; }
+            .hud-coords { font-size: 8.5px; letter-spacing: 0.25em; padding: 3px 10px; bottom: 4px; }
+
+            /* Title & label */
+            .city-title { font-size: 30px; bottom: 96px; left: 14px; }
+            .city-title::before { font-size: 22px; vertical-align: 3px; margin-right: 8px; }
+            .city-subtitle { display: none; }
+            .country-label-inner { font-size: 24px; }
+
+            /* Refinery panel internal */
+            .refinery-header { padding: 14px 16px 12px 16px; }
+            .refinery-header span { font-size: 11.5px; letter-spacing: 0.26em; }
+            .total-capacity { margin: 12px 14px; padding: 10px 12px; }
+            .capacity-number { font-size: 1.35em; }
+            .refinery-list { padding: 4px 6px 14px 12px; }
+            .refinery-item { padding: 10px 12px; }
+
+            /* Production / demand panel internal */
+            .production-demand-container { padding: 14px 14px 14px; }
+            .stats-grid { gap: 6px; margin-bottom: 12px; }
+            .stat-card { padding: 10px 8px; }
+            .stat-card .stat-value { font-size: 15px; }
+            .stat-card .stat-label { font-size: 8px; letter-spacing: 0.16em; }
+            .production-demand-title { font-size: 12.5px; letter-spacing: 0.24em; }
+            .production-demand-subtitle { font-size: 8.5px; }
+            .nav-btn { width: 28px; height: 28px; font-size: 10px; }
+            .chart-container { padding: 10px; min-height: 180px; }
+        }
+
+        /* Phones */
+        @media (max-width: 480px) {
+            .hud-topbar {
+                gap: 7px;
+                padding: 4px 10px;
+                font-size: 8.5px;
+                letter-spacing: 0.18em;
+            }
+            .hud-topbar > span:nth-of-type(n+5) { display: none; }
+            .hud-topbar #hudClock { display: inline; }
+            .city-title { font-size: 24px; bottom: 90px; left: 12px; letter-spacing: 0.14em; }
+            .city-title::before { font-size: 18px; margin-right: 6px; }
+            .country-label-inner { font-size: 20px; }
+            .hud-corner { width: 14px; height: 14px; }
+            .mob-tab { font-size: 10.5px; padding: 10px 6px; letter-spacing: 0.2em; }
+            .stat-card .stat-value { font-size: 14px; }
+            .leaflet-popup-content-wrapper { max-width: 92vw; }
+            .leaflet-popup-content { font-size: 11px; }
+        }
+
+        /* Map height on mobile — avoid iOS viewport jump */
+        @supports (height: 100dvh) {
+            @media (max-width: 900px) {
+                #map { height: 100dvh; }
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- HUD frame decorations -->
+    <div class="hud-corner tl"></div>
+    <div class="hud-corner tr"></div>
+    <div class="hud-corner bl"></div>
+    <div class="hud-corner br"></div>
+
+    <div class="hud-topbar">
+        <span class="dot"></span>
+        <span>OPS::ACTIVE</span>
+        <span class="sep">▸</span>
+        <span>GULF.GRID // SECTOR.SA</span>
+        <span class="sep">▸</span>
+        <span>LAT <span class="val">24.7136°N</span></span>
+        <span class="sep">▸</span>
+        <span>LON <span class="val">46.6753°E</span></span>
+        <span class="sep">▸</span>
+        <span id="hudClock">T+00:00:00Z</span>
+    </div>
+
+    <div class="hud-coords">// PETROLEUM TELEMETRY · KSA · ARABIAN PLATE · BLOCK CIPHER 04 //</div>
+
+    <!-- Mobile / tablet tab switcher (hidden via CSS on desktop) -->
+    <div class="mobile-tabs" id="mobileTabs">
+        <button class="mob-tab" data-target="energy">▶ DATA</button>
+        <button class="mob-tab" data-target="refinery">◆ REFINERIES</button>
+    </div>
+
     <div id="map"></div>
-    
+    <div class="map-vignette"></div>
+
     <!-- Title for the combined map -->
-    <div class="city-title" id="cityTitle">Saudi Arabia's Energy</div>
-    <div class="city-subtitle" id="citySubtitle">Production vs Demand</div>
+    <div class="city-title" id="cityTitle">SECTOR.RSA</div>
+    <div class="city-subtitle" id="citySubtitle">Production // Demand // Reserves</div>
     
     <!-- Hover tooltip for refineries -->
     <div class="refinery-tooltip" id="refineryTooltip"></div>
@@ -758,12 +1252,12 @@
     <!-- Standalone Refinery Section -->
     <div class="standalone-refinery-section">
         <div class="refinery-header">
-            <span>Refinery Capacity</span>
+            <span>REFINERY ARRAY // OUTPUT</span>
         </div>
-        <div class="refinery-content" id="refineryContent" style="display: block;">
+        <div class="refinery-content" id="refineryContent">
             <div class="total-capacity">
                 <span class="capacity-number" id="totalCapacity">0 thousand</span>
-                <span>barrels/day</span>
+                <span>BARRELS / DAY</span>
             </div>
             <div class="refinery-list" id="refineryList">
                 <!-- Refinery items will be populated by JavaScript -->
@@ -779,8 +1273,8 @@
                 <div class="energy-nav-controls">
                     <button class="nav-btn" id="prevEnergyBtn">◀</button>
                     <div class="title-section">
-                        <div class="production-demand-title" id="energyDataTitle">Refined Petroleum</div>
-                        <div class="production-demand-subtitle" id="energyDataSubtitle">Production, Demand & Exports</div>
+                        <div class="production-demand-title" id="energyDataTitle">REFINED PETROLEUM</div>
+                        <div class="production-demand-subtitle" id="energyDataSubtitle">Production · Demand · Exports</div>
                     </div>
                     <button class="nav-btn" id="nextEnergyBtn">▶</button>
                 </div>
@@ -796,49 +1290,49 @@
             <div class="energy-page" id="refinedProductsPage">
                 <div class="stats-grid" id="productionStatsGrid">
                     <div class="stat-card">
-                        <div class="stat-value" id="avgProduction">Loading...</div>
-                        <div class="stat-label">Avg Production (kb/d)</div>
+                        <div class="stat-value" id="avgProduction">— — —</div>
+                        <div class="stat-label">AVG PROD · KB/D</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="avgDemand">Loading...</div>
-                        <div class="stat-label">Avg Demand (kb/d)</div>
+                        <div class="stat-value" id="avgDemand">— — —</div>
+                        <div class="stat-label">AVG DEMAND · KB/D</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="avgSurplus">Loading...</div>
-                        <div class="stat-label">Avg Surplus (kb/d)</div>
+                        <div class="stat-value" id="avgSurplus">— — —</div>
+                        <div class="stat-label">AVG SURPLUS · KB/D</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="currentSurplus">Loading...</div>
-                        <div class="stat-label">Latest Surplus (kb/d)</div>
+                        <div class="stat-value" id="currentSurplus">— — —</div>
+                        <div class="stat-label">LATEST SURPLUS · KB/D</div>
                     </div>
                 </div>
-                
+
                 <div class="chart-container">
                     <canvas id="productionDemandChart"></canvas>
                 </div>
             </div>
-            
+
             <!-- Natural Gas Page -->
             <div class="energy-page" id="naturalGasPage" style="display: none;">
                 <div class="stats-grid" id="naturalGasStatsGrid">
                     <div class="stat-card">
-                        <div class="stat-value" id="avgGasProduction">Loading...</div>
-                        <div class="stat-label">Avg Production (MMSCFD)</div>
+                        <div class="stat-value" id="avgGasProduction">— — —</div>
+                        <div class="stat-label">AVG PROD · MMSCFD</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="avgGasConsumption">Loading...</div>
-                        <div class="stat-label">Avg Consumption (MMSCFD)</div>
+                        <div class="stat-value" id="avgGasConsumption">— — —</div>
+                        <div class="stat-label">AVG CONS · MMSCFD</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="currentGasReserves">Loading...</div>
-                        <div class="stat-label">Current Reserves (BCM)</div>
+                        <div class="stat-value" id="currentGasReserves">— — —</div>
+                        <div class="stat-label">RESERVES · BCM</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="gasReserveChange">Loading...</div>
-                        <div class="stat-label">Reserve Growth (%)</div>
+                        <div class="stat-value" id="gasReserveChange">— — —</div>
+                        <div class="stat-label">RESERVE GROWTH · %</div>
                     </div>
                 </div>
-                
+
                 <div class="chart-container">
                     <canvas id="naturalGasChart"></canvas>
                 </div>
@@ -850,11 +1344,11 @@
 
     <!-- Combined progress container for data loading and marker plotting -->
     <div class="progress-container" id="progressContainer">
-        <div class="progress-text" id="progressText">Loading restaurants...</div>
+        <div class="progress-text" id="progressText">// ESTABLISHING UPLINK</div>
         <div class="progress-bar-container">
             <div class="progress-bar" id="progressBar"></div>
         </div>
-        <div class="progress-stats" id="progressStats">0 / 0 markers loaded</div>
+        <div class="progress-stats" id="progressStats">0 / 0 TELEMETRY NODES</div>
     </div>
 
     <script>
@@ -903,12 +1397,77 @@
                 maxZoom: 18,
                 zoomControl: false,
                 maxBounds: gccBounds,
-                maxBoundsViscosity: 1.0 // Prevents panning outside bounds
+                maxBoundsViscosity: 1.0,
+                // preferCanvas: all path layers render to a canvas that gets
+                // cleared and atomically redrawn on every zoom/move.
+                // zoomAnimation off: no CSS-scale step during zoom, so the
+                // canvas can't blur. Combined: boundary is always visible,
+                // always at correct coords, never blurred.
+                preferCanvas: true,
+                zoomAnimation: false,
+                markerZoomAnimation: false
             }).setView([24.7136, 46.6753], 6); // Center on Saudi Arabia
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '© OpenStreetMap contributors, © CARTO'
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '// CARTO · OSM // GULF.GRID TELEMETRY'
             }).addTo(map);
+
+            // Saudi Arabia boundary overlay.
+            // preferCanvas: true on the map + explicit redraw on every
+            // zoom/move event = boundary forcibly re-rendered whenever the
+            // view changes. Canvas can't end up with stale content or get
+            // clipped on aggressive zoom-out.
+            fetch('data/saudi-arabia.geo.json')
+                .then(r => r.json())
+                .then(geo => {
+                    const halo = L.geoJSON(geo, {
+                        style: {
+                            color: '#ff8a1e',
+                            weight: 8,
+                            opacity: 0.18,
+                            fillColor: '#ff8a1e',
+                            fillOpacity: 0.04,
+                            lineJoin: 'round'
+                        },
+                        interactive: false
+                    }).addTo(map);
+                    const sharp = L.geoJSON(geo, {
+                        style: {
+                            color: '#ffb347',
+                            weight: 1.2,
+                            opacity: 0.95,
+                            fillOpacity: 0,
+                            lineJoin: 'round'
+                        },
+                        interactive: false
+                    }).addTo(map);
+
+                    // Explicit redraw on every view change. eachLayer().redraw()
+                    // forces the canvas renderer to recompute path coords and
+                    // repaint, so the boundary CANNOT be left out-of-date when
+                    // zooming out, panning, or resizing.
+                    const redrawAll = () => {
+                        halo.eachLayer(l => l.redraw && l.redraw());
+                        sharp.eachLayer(l => l.redraw && l.redraw());
+                    };
+                    map.on('zoomend moveend resize', redrawAll);
+                    redrawAll();
+
+                    // Country label centered on the geojson bounds
+                    const labelIcon = L.divIcon({
+                        className: 'country-label',
+                        html: '<div class="country-label-inner">SAUDI ARABIA</div>',
+                        iconSize: [320, 50],
+                        iconAnchor: [160, 25]
+                    });
+                    L.marker(sharp.getBounds().getCenter(), {
+                        icon: labelIcon,
+                        interactive: false,
+                        keyboard: false,
+                        zIndexOffset: -500
+                    }).addTo(map);
+                })
+                .catch(err => console.warn('Saudi GeoJSON failed to load:', err));
 
             progressContainer = document.getElementById('progressContainer');
             progressBar = document.getElementById('progressBar');
@@ -1040,11 +1599,64 @@
 
 
 
+        // HUD telemetry clock
+        function startHudClock() {
+            const el = document.getElementById('hudClock');
+            if (!el) return;
+            const tick = () => {
+                const d = new Date();
+                const hh = String(d.getUTCHours()).padStart(2, '0');
+                const mm = String(d.getUTCMinutes()).padStart(2, '0');
+                const ss = String(d.getUTCSeconds()).padStart(2, '0');
+                el.textContent = `T+${hh}:${mm}:${ss}Z`;
+            };
+            tick();
+            setInterval(tick, 1000);
+        }
+
+        // Mobile drawer toggle
+        function setupMobileTabs() {
+            const energyPanel = document.querySelector('.production-demand-section');
+            const refineryPanel = document.querySelector('.standalone-refinery-section');
+            const tabs = document.querySelectorAll('.mob-tab');
+
+            tabs.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.dataset.target;
+                    const panel = target === 'energy' ? energyPanel : refineryPanel;
+                    const other = target === 'energy' ? refineryPanel : energyPanel;
+                    const otherBtn = document.querySelector(
+                        `.mob-tab[data-target="${target === 'energy' ? 'refinery' : 'energy'}"]`
+                    );
+
+                    if (panel.classList.contains('mobile-open')) {
+                        panel.classList.remove('mobile-open');
+                        btn.classList.remove('active');
+                    } else {
+                        panel.classList.add('mobile-open');
+                        btn.classList.add('active');
+                        other.classList.remove('mobile-open');
+                        otherBtn.classList.remove('active');
+                        // Force chart resize when drawer opens
+                        setTimeout(() => {
+                            if (target === 'energy') {
+                                if (productionDemandChart) productionDemandChart.resize();
+                                if (naturalGasChart) naturalGasChart.resize();
+                            }
+                            if (map) map.invalidateSize();
+                        }, 280);
+                    }
+                });
+            });
+        }
+
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initializeMap();
             loadData();
             initializeRefineries();
+            startHudClock();
+            setupMobileTabs();
         });
 
         // Refinery data and functionality
@@ -1183,13 +1795,13 @@
                     datasets: [{
                         label: 'Capacity (thousand b/cd)',
                         data: capacities,
-                        borderColor: 'rgba(255, 255, 255, 0.9)',
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        borderWidth: 0,
+                        borderColor: '#ff8a1e',
+                        backgroundColor: 'rgba(255, 138, 30, 0.12)',
+                        borderWidth: 1.2,
                         fill: true,
-                        tension: 0.4,
-                        pointBackgroundColor: 'rgba(255, 255, 255, 0.9)',
-                        pointBorderColor: 'rgba(255, 255, 255, 1)',
+                        tension: 0.35,
+                        pointBackgroundColor: '#ffb347',
+                        pointBorderColor: '#ff8a1e',
                         pointRadius: 2
                     }]
                 },
@@ -1204,23 +1816,25 @@
                     scales: {
                         x: {
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.2)'
+                                color: 'rgba(255, 138, 30, 0.12)'
                             },
                             ticks: {
-                                color: 'rgba(255, 255, 255, 0.8)',
+                                color: 'rgba(232, 221, 199, 0.7)',
                                 font: {
-                                    size: 10
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             }
                         },
                         y: {
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.2)'
+                                color: 'rgba(255, 138, 30, 0.12)'
                             },
                             ticks: {
-                                color: 'rgba(255, 255, 255, 0.8)',
+                                color: 'rgba(232, 221, 199, 0.7)',
                                 font: {
-                                    size: 10
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             }
                         }
@@ -1242,8 +1856,8 @@
                 refineryDiv.innerHTML = `
                     <div class="refinery-name">${refinery.name}</div>
                     <div class="refinery-company">${refinery.company}</div>
-                    <div class="refinery-capacity">${refinery.capacity.toLocaleString()} k b/cd</div>
-                    <div class="refinery-location">📍 ${refinery.location}</div>
+                    <div class="refinery-capacity">${refinery.capacity.toLocaleString()} K B/CD</div>
+                    <div class="refinery-location">◇ ${refinery.location}</div>
                 `;
                 
                 refineryDiv.addEventListener('click', () => {
@@ -1254,22 +1868,33 @@
             });
         }
 
-        // Create arrow above emoji with dramatic height differences and translucent fill
+        // Create arrow above HUD glyph with dramatic height differences
         function createRefineryWithArrow(refinery) {
             const maxCapacity = Math.max(...refineries.map(r => r.capacity));
-            const minArrowHeight = 8;
-            const maxArrowHeight = 90; // Much larger range for contrast
+            const minArrowHeight = 10;
+            const maxArrowHeight = 92;
             const arrowHeight = minArrowHeight + ((refinery.capacity / maxCapacity) * (maxArrowHeight - minArrowHeight));
-            
+            const gradId = 'aGrad_' + refinery.lat.toString().replace('.', '_') + '_' + refinery.lng.toString().replace('.', '_');
+
             return `
                 <div class="refinery-with-arrow">
-                    <svg width="12" height="${arrowHeight + 5}" style="margin-bottom: 2px;">
-                        <polygon points="6,0 10,${arrowHeight} 2,${arrowHeight}" 
-                                 fill="rgba(25, 118, 210, 0.4)" 
-                                 stroke="#1976D2" 
-                                 stroke-width="1"/>
+                    <svg width="16" height="${arrowHeight + 8}" style="margin-bottom: 2px; overflow: visible;">
+                        <defs>
+                            <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#ffb347" stop-opacity="0.95"/>
+                                <stop offset="60%" stop-color="#ff8a1e" stop-opacity="0.6"/>
+                                <stop offset="100%" stop-color="#ff8a1e" stop-opacity="0.05"/>
+                            </linearGradient>
+                        </defs>
+                        <polygon points="8,0 12,${arrowHeight} 4,${arrowHeight}"
+                                 fill="url(#${gradId})"
+                                 stroke="#ff8a1e"
+                                 stroke-width="1"
+                                 style="filter: drop-shadow(0 0 4px rgba(255, 138, 30, 0.7));"/>
+                        <line x1="8" y1="0" x2="8" y2="-4" stroke="#ffb347" stroke-width="1"/>
+                        <circle cx="8" cy="-6" r="2" fill="#ffb347" style="filter: drop-shadow(0 0 4px #ff8a1e);"/>
                     </svg>
-                    <div class="refinery-emoji">🛢️</div>
+                    <div class="refinery-emoji">◆</div>
                 </div>
             `;
         }
@@ -1282,6 +1907,11 @@
                     html: createRefineryWithArrow(refinery),
                     iconSize: [50, 80],
                     iconAnchor: [25, 75],
+                    // popupAnchor is measured from iconAnchor. Towers extend up
+                    // to ~100 px above the icon anchor, so anchor the popup
+                    // 110 px above so the click-popup never sits on top of
+                    // the bar — the tower is fully visible.
+                    popupAnchor: [0, -110],
                     className: 'refinery-marker'
                 });
 
@@ -1291,19 +1921,24 @@
                 const hasChartData = getRefineryCapacityHistory(refinery.name).length > 0;
                 
                 const popupContent = `
-                    <div style="font-family: Arial, sans-serif; min-width: 280px; background: linear-gradient(135deg, rgba(30, 64, 175, 0.95), rgba(30, 58, 138, 0.95)); color: white; padding: 24px; margin: -10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
-                        <h3 style="margin: 0 0 16px 0; color: white; font-size: 16px; font-weight: bold;">${refinery.name}</h3>
-                        <div style="margin: 10px 0; font-size: 13px; opacity: 0.9;"><strong>Company:</strong> ${refinery.company}</div>
-                        <div style="margin: 10px 0; font-size: 13px; opacity: 0.9;"><strong>Location:</strong> ${refinery.location}</div>
-                        <div style="margin: 10px 0; font-size: 13px; opacity: 0.9;"><strong>Current Capacity:</strong> ${refinery.capacity.toLocaleString()} thousand b/cd</div>
+                    <div style="font-family: 'Segoe UI', system-ui, sans-serif; min-width: 300px; background: rgba(10, 13, 18, 0.96); color: #e8ddc7; padding: 20px 22px; box-shadow: 0 0 30px rgba(0,0,0,0.85); backdrop-filter: blur(8px); border: 1px solid #ff8a1e; position: relative;">
+                        <div style="position: absolute; top: -1px; left: -1px; width: 10px; height: 10px; border-top: 1px solid #ff8a1e; border-left: 1px solid #ff8a1e;"></div>
+                        <div style="position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-top: 1px solid #ff8a1e; border-right: 1px solid #ff8a1e;"></div>
+                        <div style="position: absolute; bottom: -1px; left: -1px; width: 10px; height: 10px; border-bottom: 1px solid #ff8a1e; border-left: 1px solid #ff8a1e;"></div>
+                        <div style="position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px; border-bottom: 1px solid #ff8a1e; border-right: 1px solid #ff8a1e;"></div>
+                        <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 9.5px; color: #ff8a1e; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 6px;">◢ REFINERY NODE</div>
+                        <h3 style="margin: 0 0 14px 0; color: #ff8a1e; font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 0 14px rgba(255, 138, 30, 0.5);">${refinery.name}</h3>
+                        <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 11px; color: rgba(232, 221, 199, 0.55); letter-spacing: 0.15em; margin: 8px 0; text-transform: uppercase;"><span style="color:#ff8a1e;">OPERATOR ▸</span> <span style="color:#e8ddc7;">${refinery.company}</span></div>
+                        <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 11px; color: rgba(232, 221, 199, 0.55); letter-spacing: 0.15em; margin: 8px 0; text-transform: uppercase;"><span style="color:#ff8a1e;">SECTOR ▸</span> <span style="color:#e8ddc7;">${refinery.location}</span></div>
+                        <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 11px; color: rgba(232, 221, 199, 0.55); letter-spacing: 0.15em; margin: 8px 0; text-transform: uppercase;"><span style="color:#ff8a1e;">CAPACITY ▸</span> <span style="color:#ffb347; font-weight: 700;">${refinery.capacity.toLocaleString()}</span> <span>K B/CD</span></div>
                         ${hasChartData ? `
-                        <div style="margin: 16px 0; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px;">
-                            <div style="font-size: 12px; margin-bottom: 8px; opacity: 0.9; font-weight: bold;">Capacity History</div>
+                        <div style="margin: 14px 0 0 0; padding: 12px; background: rgba(255, 138, 30, 0.05); border: 1px solid rgba(255, 138, 30, 0.22); border-left: 2px solid #ff8a1e;">
+                            <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 9.5px; margin-bottom: 8px; color: #ff8a1e; font-weight: 400; letter-spacing: 0.28em; text-transform: uppercase;">// CAPACITY TIMELINE</div>
                             <div style="height: 120px; position: relative;">
                                 <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
                             </div>
                         </div>` : ''}
-                        <div style="margin: 16px 0 0 0; font-size: 12px; opacity: 0.8; line-height: 1.4; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid rgba(255,255,255,0.4);">${refinery.description}</div>
+                        <div style="margin: 14px 0 0 0; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11.5px; color: rgba(232, 221, 199, 0.75); line-height: 1.5; padding: 10px 12px; background: rgba(255, 138, 30, 0.04); border: 1px solid rgba(255, 138, 30, 0.18); border-left: 2px solid #ff8a1e;">${refinery.description}</div>
                     </div>
                 `;
                 
@@ -1311,9 +1946,13 @@
                 
                 // Create chart when popup opens and disable bounds viscosity
                 marker.on('popupopen', function() {
+                    // Highlight this marker's tower while the popup is open
+                    const iconEl = marker.getElement();
+                    if (iconEl) iconEl.classList.add('is-active');
+
                     // Temporarily remove bounds entirely for better popup viewing
                     map.setMaxBounds(null);
-                    
+
                     const hasChartData = getRefineryCapacityHistory(refinery.name).length > 0;
                     if (hasChartData) {
                         setTimeout(() => {
@@ -1321,9 +1960,13 @@
                         }, 100); // Small delay to ensure DOM is ready
                     }
                 });
-                
+
                 // Re-enable bounds when popup closes
                 marker.on('popupclose', function() {
+                    // Drop the active highlight
+                    const iconEl = marker.getElement();
+                    if (iconEl) iconEl.classList.remove('is-active');
+
                     // Re-enable bounds with expanded GCC region and viscosity
                     const gccBounds = [
                         [7.0, 29.0], // Southwest - offset by 5 degrees
@@ -1331,19 +1974,19 @@
                     ];
                     map.setMaxBounds(gccBounds);
                     map.options.maxBoundsViscosity = 1.0;
-                    
+
                     // Force map to fit within bounds if currently outside
                     if (!gccBounds[0] || !gccBounds[1] || !map.getBounds().intersects(L.latLngBounds(gccBounds))) {
-                        map.fitBounds(gccBounds, { animate: true, duration: 0.5 });
+                        map.fitBounds(gccBounds, { animate: false });
                     }
                 });
                 
                 // Add hover events for tooltip
                 marker.on('mouseover', function(e) {
                     const tooltipContent = `
-                        <div style="font-weight: bold; margin-bottom: 4px;">${refinery.name}</div>
-                        <div style="font-size: 11px; opacity: 0.9;">${refinery.capacity.toLocaleString()} k b/cd</div>
-                        <div style="font-size: 10px; opacity: 0.8;">📍 ${refinery.location}</div>
+                        <div style="font-family: 'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif; font-weight: 700; margin-bottom: 4px; color: #ff8a1e; letter-spacing: 0.12em; text-transform: uppercase; font-size: 11px;">${refinery.name}</div>
+                        <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 10px; color: #ffb347; letter-spacing: 0.1em;">▸ ${refinery.capacity.toLocaleString()} K B/CD</div>
+                        <div style="font-family: 'Consolas', 'Lucida Console', 'Courier New', monospace; font-size: 9.5px; color: rgba(232, 221, 199, 0.55); letter-spacing: 0.12em; text-transform: uppercase;">◇ ${refinery.location}</div>
                     `;
                     tooltip.innerHTML = tooltipContent;
                     tooltip.classList.add('visible');
@@ -1354,10 +1997,16 @@
                 });
                 
                 marker.on('mousemove', function(e) {
-                    const mouseX = e.originalEvent.clientX;
-                    const mouseY = e.originalEvent.clientY;
-                    tooltip.style.left = (mouseX + 10) + 'px';
-                    tooltip.style.top = (mouseY - 50) + 'px';
+                    // Position the tooltip ABOVE the arrow marker rather than
+                    // above the mouse pointer. Arrow markers extend up to
+                    // ~95 px above the anchor point, so offset enough to clear
+                    // the tallest arrow plus the tooltip's own height.
+                    const point = map.latLngToContainerPoint(marker.getLatLng());
+                    const rect = tooltip.getBoundingClientRect();
+                    const tipHeight = rect.height || 70;
+                    const tipWidth = rect.width || 200;
+                    tooltip.style.left = (point.x - tipWidth / 2) + 'px';
+                    tooltip.style.top = (point.y - 100 - tipHeight) + 'px';
                 });
                 
                 refineryMarkers.push(marker);
@@ -1365,9 +2014,10 @@
         }
 
         function zoomToRefinery(refinery) {
-            map.setView([refinery.lat, refinery.lng], 10);
-            // Find and open the popup for this refinery
-            const marker = refineryMarkers.find(m => 
+            // Instant snap (no animate) — animated zoom CSS-scales the SVG pane
+            // and blurs / misaligns the boundary until the redraw lands
+            map.setView([refinery.lat, refinery.lng], 10, { animate: false });
+            const marker = refineryMarkers.find(m =>
                 m.getLatLng().lat === refinery.lat && m.getLatLng().lng === refinery.lng
             );
             if (marker) {
@@ -1645,11 +2295,35 @@
             
             const avgSurplusElement = document.getElementById('avgSurplus');
             avgSurplusElement.textContent = (stats.avgSurplus >= 0 ? '+' : '') + stats.avgSurplus.toLocaleString();
-            avgSurplusElement.style.color = stats.avgSurplus >= 0 ? '#00be9d' : '#f44336';
+            avgSurplusElement.style.color = stats.avgSurplus >= 0 ? '#c8ff3a' : '#ff5c00';
             
             const currentSurplusElement = document.getElementById('currentSurplus');
             currentSurplusElement.textContent = (stats.currentSurplus >= 0 ? '+' : '') + stats.currentSurplus.toLocaleString();
-            currentSurplusElement.style.color = stats.currentSurplus >= 0 ? '#00be9d' : '#f44336';
+            currentSurplusElement.style.color = stats.currentSurplus >= 0 ? '#c8ff3a' : '#ff5c00';
+        }
+
+        // Diagonal hatch pattern factory for surplus/deficit fills
+        function createHatchPattern(rgbaColor, slope) {
+            const size = 8;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = rgbaColor;
+            ctx.lineWidth = 1;
+            ctx.lineCap = 'square';
+            if (slope === 'up') {
+                // bottom-left to top-right "/"
+                ctx.beginPath(); ctx.moveTo(0, size); ctx.lineTo(size, 0); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-1, 1); ctx.lineTo(1, -1); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(size - 1, size + 1); ctx.lineTo(size + 1, size - 1); ctx.stroke();
+            } else {
+                // top-left to bottom-right "\"
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(size, size); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-1, size - 1); ctx.lineTo(1, size + 1); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(size - 1, -1); ctx.lineTo(size + 1, 1); ctx.stroke();
+            }
+            return ctx.createPattern(canvas, 'repeat');
         }
 
         // Create the production vs demand chart
@@ -1668,17 +2342,20 @@
 
             const labels = yearlyProduction.map(d => `'${d.year.toString().slice(-2)}`);
 
+            const surplusPattern = createHatchPattern('rgba(200, 255, 58, 0.45)', 'up');
+            const deficitPattern = createHatchPattern('rgba(255, 92, 0, 0.45)', 'down');
+
             const datasets = [
                 {
                     label: 'Production',
                     data: yearlyProduction.map(d => d.value),
-                    borderColor: '#2E7D32',
-                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
-                    borderWidth: 1,
-                    fill: false,
+                    borderColor: '#c8ff3a',
+                    backgroundColor: 'rgba(200, 255, 58, 0.08)',
+                    borderWidth: 1.2,
+                    fill: { target: 1, above: surplusPattern, below: deficitPattern },
                     tension: 0.4,
-                    pointBackgroundColor: '#2E7D32',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#c8ff3a',
+                    pointBorderColor: '#060709',
                     pointBorderWidth: 0.5,
                     pointRadius: 1,
                     pointHoverRadius: 4
@@ -1686,13 +2363,13 @@
                 {
                     label: 'Demand',
                     data: yearlyDemand.map(d => d.value),
-                    borderColor: '#D32F2F',
-                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
-                    borderWidth: 1,
+                    borderColor: '#ff8a1e',
+                    backgroundColor: 'rgba(255, 138, 30, 0.08)',
+                    borderWidth: 1.2,
                     fill: false,
                     tension: 0.4,
-                    pointBackgroundColor: '#D32F2F',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#ff8a1e',
+                    pointBorderColor: '#060709',
                     pointBorderWidth: 0.5,
                     pointRadius: 1,
                     pointHoverRadius: 4
@@ -1704,13 +2381,13 @@
                 datasets.push({
                     label: 'Exports',
                     data: yearlyExports.map(d => d.value),
-                    borderColor: '#1976D2',
-                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
-                    borderWidth: 1,
+                    borderColor: '#ffd599',
+                    backgroundColor: 'rgba(255, 213, 153, 0.08)',
+                    borderWidth: 1.2,
                     fill: false,
                     tension: 0.4,
-                    pointBackgroundColor: '#1976D2',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#ffd599',
+                    pointBorderColor: '#060709',
                     pointBorderWidth: 0.5,
                     pointRadius: 1,
                     pointHoverRadius: 4
@@ -1731,30 +2408,34 @@
                         mode: 'index'
                     },
                     plugins: {
-                        
                         legend: {
                             position: 'top',
                             labels: {
                                 usePointStyle: false,
                                 boxWidth: 20,
                                 boxHeight: 1,
-                                padding: 20,
+                                padding: 16,
+                                color: '#e8ddc7',
                                 font: {
-                                    size: 11
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            titleColor: '#ffffff',
-                            bodyColor: '#ffffff',
-                            borderColor: '#1976D2',
+                            backgroundColor: 'rgba(6, 7, 9, 0.95)',
+                            titleColor: '#ff8a1e',
+                            bodyColor: '#e8ddc7',
+                            borderColor: '#ff8a1e',
                             borderWidth: 1,
-                            cornerRadius: 6,
+                            cornerRadius: 0,
                             displayColors: true,
+                            titleFont: { family: "'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif", size: 11, weight: '700' },
+                            bodyFont: { family: "'Consolas', 'Lucida Console', 'Courier New', monospace", size: 10.5 },
+                            padding: 10,
                             callbacks: {
                                 label: function(context) {
-                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} kb/d`;
+                                    return `${context.dataset.label.toUpperCase()} ▸ ${context.parsed.y.toLocaleString()} KB/D`;
                                 },
                                 afterBody: function(context) {
                                     if (context.length >= 2) {
@@ -1762,13 +2443,13 @@
                                         const demand = context.find(c => c.datasetIndex === 1)?.parsed.y || 0;
                                         const exports = context.find(c => c.datasetIndex === 2)?.parsed.y || 0;
                                         const surplus = production - demand;
-                                        
-                                        const result = [``, `Surplus: ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} kb/d`];
-                                        
+
+                                        const result = [``, `SURPLUS ▸ ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} KB/D`];
+
                                         if (exports > 0) {
-                                            result.push(`Net Domestic Use: ${(demand - exports).toLocaleString()} kb/d`);
+                                            result.push(`NET DOMESTIC ▸ ${(demand - exports).toLocaleString()} KB/D`);
                                         }
-                                        
+
                                         return result;
                                     }
                                     return [];
@@ -1781,45 +2462,51 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Year',
+                                text: '// YEAR',
                                 font: {
-                                    size: 11
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 },
-                                color: '#1976D2'
+                                color: '#ff8a1e'
                             },
                             ticks: {
                                 maxTicksLimit: 15,
                                 maxRotation: 0,
-                                color: '#666666',
+                                color: 'rgba(232, 221, 199, 0.55)',
                                 font: {
-                                    size: 9
+                                    size: 9,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             },
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                                color: 'rgba(255, 138, 30, 0.08)',
+                                drawBorder: false
                             }
                         },
                         y: {
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Volume (kb/d)',
+                                text: '// VOLUME · KB/D',
                                 font: {
-                                    size: 11
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 },
-                                color: '#1976D2'
+                                color: '#ff8a1e'
                             },
                             ticks: {
                                 callback: function(value) {
                                     return value.toLocaleString();
                                 },
-                                color: '#666666',
+                                color: 'rgba(232, 221, 199, 0.55)',
                                 font: {
-                                    size: 9
+                                    size: 9,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             },
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                                color: 'rgba(255, 138, 30, 0.08)',
+                                drawBorder: false
                             }
                         }
                     }
@@ -1846,17 +2533,20 @@
                 return reservesMMCF / (365 * 50); // Theoretical daily rate if depleted over 50 years
             });
 
+            const surplusPattern = createHatchPattern('rgba(200, 255, 58, 0.45)', 'up');
+            const deficitPattern = createHatchPattern('rgba(255, 92, 0, 0.45)', 'down');
+
             const datasets = [
                 {
                     label: 'Production',
                     data: production.map(d => d.value),
-                    borderColor: '#2E7D32',
-                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
-                    borderWidth: 1,
-                    fill: false,
+                    borderColor: '#c8ff3a',
+                    backgroundColor: 'rgba(200, 255, 58, 0.08)',
+                    borderWidth: 1.2,
+                    fill: { target: 1, above: surplusPattern, below: deficitPattern },
                     tension: 0.4,
-                    pointBackgroundColor: '#2E7D32',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#c8ff3a',
+                    pointBorderColor: '#060709',
                     pointBorderWidth: 0.5,
                     pointRadius: 1,
                     pointHoverRadius: 4
@@ -1864,13 +2554,13 @@
                 {
                     label: 'Consumption',
                     data: consumption.map(d => d.value),
-                    borderColor: '#D32F2F',
-                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
-                    borderWidth: 1,
+                    borderColor: '#ff8a1e',
+                    backgroundColor: 'rgba(255, 138, 30, 0.08)',
+                    borderWidth: 1.2,
                     fill: false,
                     tension: 0.4,
-                    pointBackgroundColor: '#D32F2F',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#ff8a1e',
+                    pointBorderColor: '#060709',
                     pointBorderWidth: 0.5,
                     pointRadius: 1,
                     pointHoverRadius: 4
@@ -1878,13 +2568,13 @@
                 {
                     label: 'Reserve Capacity (50yr)',
                     data: reservesDailyEquivalent,
-                    borderColor: '#1976D2',
-                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
-                    borderWidth: 1,
+                    borderColor: '#ffd599',
+                    backgroundColor: 'rgba(255, 213, 153, 0.08)',
+                    borderWidth: 1.2,
                     fill: false,
                     tension: 0.4,
-                    pointBackgroundColor: '#1976D2',
-                    pointBorderColor: '#ffffff',
+                    pointBackgroundColor: '#ffd599',
+                    pointBorderColor: '#060709',
                     pointBorderWidth: 0.5,
                     pointRadius: 1,
                     pointHoverRadius: 4
@@ -1912,43 +2602,47 @@
                                 boxWidth: 20,
                                 boxHeight: 1,
                                 padding: 12,
+                                color: '#e8ddc7',
                                 font: {
-                                    size: 11
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            titleColor: '#ffffff',
-                            bodyColor: '#ffffff',
-                            borderColor: '#1976D2',
+                            backgroundColor: 'rgba(6, 7, 9, 0.95)',
+                            titleColor: '#ff8a1e',
+                            bodyColor: '#e8ddc7',
+                            borderColor: '#ff8a1e',
                             borderWidth: 1,
-                            cornerRadius: 6,
+                            cornerRadius: 0,
                             displayColors: true,
+                            titleFont: { family: "'Bahnschrift Condensed', 'Bahnschrift', 'Impact', 'Arial Narrow', sans-serif", size: 11, weight: '700' },
+                            bodyFont: { family: "'Consolas', 'Lucida Console', 'Courier New', monospace", size: 10.5 },
+                            padding: 10,
                             callbacks: {
                                 label: function(context) {
-                                    const unit = context.dataset.label.includes('Reserve') ? ' MMSCFD' : ' MMSCFD';
-                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}${unit}`;
+                                    return `${context.dataset.label.toUpperCase()} ▸ ${context.parsed.y.toLocaleString()} MMSCFD`;
                                 },
                                 afterBody: function(context) {
                                     const productionContext = context.find(c => c.dataset.label === 'Production');
                                     const consumptionContext = context.find(c => c.dataset.label === 'Consumption');
                                     const reserveContext = context.find(c => c.dataset.label.includes('Reserve'));
-                                    
+
                                     const result = [];
-                                    
+
                                     if (productionContext && consumptionContext) {
                                         const production = productionContext.parsed.y;
                                         const consumption = consumptionContext.parsed.y;
                                         const surplus = production - consumption;
-                                        
-                                        result.push(``, `${surplus >= 0 ? '📈 Surplus' : '📉 Deficit'}: ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} MMSCFD`);
+
+                                        result.push(``, `${surplus >= 0 ? '▲ SURPLUS' : '▼ DEFICIT'} ▸ ${surplus >= 0 ? '+' : ''}${surplus.toLocaleString()} MMSCFD`);
                                     }
-                                    
+
                                     if (reserveContext) {
-                                        result.push(`💎 Note: Reserve shown as 50-year depletion rate`);
+                                        result.push(`◆ RESERVE ▸ 50-YEAR DEPLETION RATE`);
                                     }
-                                    
+
                                     return result;
                                 }
                             }
@@ -1959,45 +2653,51 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Year',
+                                text: '// YEAR',
                                 font: {
-                                    size: 11
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 },
-                                color: '#1976D2'
+                                color: '#ff8a1e'
                             },
                             ticks: {
                                 maxTicksLimit: 15,
                                 maxRotation: 0,
-                                color: '#666666',
+                                color: 'rgba(232, 221, 199, 0.55)',
                                 font: {
-                                    size: 9
+                                    size: 9,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             },
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                                color: 'rgba(255, 138, 30, 0.08)',
+                                drawBorder: false
                             }
                         },
                         y: {
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Volume (MMSCFD)',
+                                text: '// VOLUME · MMSCFD',
                                 font: {
-                                    size: 11
+                                    size: 10,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 },
-                                color: '#1976D2'
+                                color: '#ff8a1e'
                             },
                             ticks: {
                                 callback: function(value) {
                                     return value.toLocaleString();
                                 },
-                                color: '#666666',
+                                color: 'rgba(232, 221, 199, 0.55)',
                                 font: {
-                                    size: 9
+                                    size: 9,
+                                    family: "'Consolas', 'Lucida Console', 'Courier New', monospace"
                                 }
                             },
                             grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+                                color: 'rgba(255, 138, 30, 0.08)',
+                                drawBorder: false
                             }
                         }
                     }
@@ -2067,7 +2767,7 @@
                 
                 const reserveChangeElement = document.getElementById('gasReserveChange');
                 reserveChangeElement.textContent = (reserveGrowth >= 0 ? '+' : '') + reserveGrowth.toFixed(1) + '%';
-                reserveChangeElement.style.color = reserveGrowth >= 0 ? '#00be9d' : '#f44336';
+                reserveChangeElement.style.color = reserveGrowth >= 0 ? '#c8ff3a' : '#ff5c00';
 
                 // Create the natural gas chart
                 createNaturalGasChart(production, consumption, reserves);
